@@ -129,7 +129,7 @@ class Database:
         self.databaseFilename = databaseFilename
 
     def load(self,databaseFile):
-        print("loading ", databasePath, "...")
+        print("loading ", databaseFile, "...")
         databasePath ="resources/databases/" + databaseFile
         recordings = []
         with open(databasePath, "r") as openfileobject:
@@ -138,14 +138,17 @@ class Database:
         print(databasePath," loaded.")
         return recordings
     
-    def save(self, fileObjects):
-        file ="resources/databases/" + self.datbaseFilename
+    def save(self,  fileObjects=None):
+        if fileObjects is None:
+            fileObjects = self.databaseFilename
+        file ="resources/databases/" + self.fileObjects
         f = open(file, "w")
         for recording in fileObjects:
             f.writelines([recording.path,SP1,recording.audio2vecStr,os.linesep])
             f.close()
-        print("Database ", self.databaseFilename ," has been saved to file.")
+        print("Database has been saved to file", self.databaseFilename)
     
 
-
-            
+audio2vecDB = Database("audio2vec512.csv")
+print(audio2vecDB.recordings[0].path)
+audio2vecDB.save()
