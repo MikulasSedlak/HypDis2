@@ -1,15 +1,17 @@
 import os
+import pyannote.audio
+import pyannote.pipeline
 import torch
 import torchaudio
 import math
 from scipy.sparse import coo_matrix
 from audio2vec import Audio2Vec
-
+import pyannote.audio
 #splitters hierarchy in ".csv"
 SP1 = ","
 SP2 = "/"
 SP3 = "_"
-
+testfilename = "resources/recordings/K/K1003/K1003_0.0_1.wav"
 class Recording:
     def __init__(self,recording): #initialization is one line from files.csv, can be also initialized form other ".csv" databases
             #contains booleans: hasPD, isMale, 
@@ -78,7 +80,7 @@ def getPDvecs(recordings): #takes list of recordings retruns two tensors with [h
     return hasPDvec, noPDvec
 
     
-def get_all_file_paths(dir):   #filepaths = get_all_file_paths("resources/recordings")
+def get_all_file_paths(dir="resources/recordings"):   #filepaths = get_all_file_paths("resources/recordings")
     file_paths = []
     filecount = 0
     for root, _, files in os.walk(dir):
@@ -123,8 +125,10 @@ def saveConfusionMatrix(filename, fileObjects):
     f.close()
 
 
+
+
 class Database:
-    def __init__(self,databaseFilename):
+    def __init__(self,databaseFilename="files.csv"):
         self.recordings = self.load(databaseFilename)
         self.databaseFilename = databaseFilename
 
@@ -147,8 +151,62 @@ class Database:
             f.writelines([recording.path,SP1,recording.audio2vecStr,os.linesep])
             f.close()
         print("Database has been saved to file", self.databaseFilename)
+
+    def makeAudio2Vec(self, n,recordings):
+        processor = Audio2Vec(n)
+        fileCount = 0
+        for recording in recordings:
+            filepath = recording.path
+            # checking if it is a file
+            if os.path.isfile(filepath):
+
+                data = processor.audio2VectorProcessor(filepath)
+                dense_tensor = torch.zeros((1, n), dtype=torch.float32)
+                
+                coo_data = data.tocoo()
+                rows = coo_data.row
+                cols = coo_data.col
+                values = coo_data.data
+                print(len(values))
+
+                # Fill the dense tensor using extracted data
+                for row, col, value in zip(rows, cols, values):
+                    dense_tensor[row, col] = value
+                dense_tensor = torch.squeeze(dense_tensor)
+                recording.audio2vecSave(dense_tensor)
+                
+                fileCount+=1
+                print("filecount: ",fileCount)
+        print(f"All embeddings of {n} features, were created !")
+        self.recordings = recordings
+
+    def makePyannote(self):
+
+        from pyannote.audio import Model
+        from pyannote.audio import Inference
+        # Load pre-trained speaker embedding model
+        model = Model.from_pretrained("pyannote/embedding", use_auth_token="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")
+
+        inference = Inference(model, window="whole")
+
+
+        
+        fileCount = 0
+        for recording in self.recordings:
+            filepath = recording.path
+            # checking if it is a file
+            if os.path.isfile(filepath):
+
+                embedding = inference(filepath)
+
+                recording.audio2vecSave(embedding)
+                
+                fileCount+=1
+                print("filecount: ",fileCount)
+        print(f"All embeddings of {n} features, were created !")
     
 
-audio2vecDB = Database("audio2vec512.csv")
-print(audio2vecDB.recordings[0].path)
-audio2vecDB.save()
+
+pyannoteDB = Database()
+pyannoteDB.makePyannote()
+pyannoteDB.save("pyannote.csv")
