@@ -7,11 +7,15 @@ import math
 from scipy.sparse import coo_matrix
 from audio2vec import Audio2Vec
 import pyannote.audio
+import wave
+import librosa
+import numpy as np
 #splitters hierarchy in ".csv"
 SP1 = ","
 SP2 = "/"
 SP3 = "_"
 testfilename = "resources/recordings/K/K1003/K1003_0.0_1.wav"
+
 class Recording:
     def __init__(self,recording): #initialization is one line from files.csv, can be also initialized form other ".csv" databases
             #contains booleans: hasPD, isMale, 
@@ -128,9 +132,16 @@ def saveConfusionMatrix(filename, fileObjects):
 
 
 class Database:
+    count = 0
     def __init__(self,databaseFilename="files.csv"):
         self.recordings = self.load(databaseFilename)
         self.databaseFilename = databaseFilename
+        self.count = 0
+    @staticmethod
+    def countFunc():
+        Database.count +=1
+        print("count: ", Database.count)
+    
 
     def load(self,databaseFile):
         print("loading ", databaseFile, "...")
@@ -142,15 +153,18 @@ class Database:
         print(databasePath," loaded.")
         return recordings
     
-    def save(self,  fileObjects=None):
+    def save(self, fileObjects=None):
+        if fileObjects == "files.csv":
+            raise NameError("Cannot save as files.csv")           
         if fileObjects is None:
             fileObjects = self.databaseFilename
-        file ="resources/databases/" + self.fileObjects
+        file ="resources/databases/" + fileObjects
         f = open(file, "w")
-        for recording in fileObjects:
+        for recording in self.recordings:
             f.writelines([recording.path,SP1,recording.audio2vecStr,os.linesep])
-            f.close()
-        print("Database has been saved to file", self.databaseFilename)
+        f.close()
+        print("Database has been saved to file", fileObjects)
+
 
     def makeAudio2Vec(self, n,recordings):
         processor = Audio2Vec(n)
@@ -179,34 +193,73 @@ class Database:
                 print("filecount: ",fileCount)
         print(f"All embeddings of {n} features, were created !")
         self.recordings = recordings
+    
+    @staticmethod
+    def processRecording(recording, inference):
+        filepath = recording.path
+        # checking if it is a file
+        if os.path.isfile(filepath):
+            #sampleCount = getSampleNumber(filepath)
+            #print("Samples: {n}", sampleCount)
+            
+            embedding = inference(filepath)
+            embedding =  np.median(embedding.data, axis=0)
+
+            recording.audio2vecSave(embedding)
+            #Database.countFunc()
 
     def makePyannote(self):
 
         from pyannote.audio import Model
         from pyannote.audio import Inference
+
         # Load pre-trained speaker embedding model
         model = Model.from_pretrained("pyannote/embedding", use_auth_token="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")
-
-        inference = Inference(model, window="whole")
-
-
+        inference = Inference(model, window="sliding")
         
-        fileCount = 0
-        for recording in self.recordings:
-            filepath = recording.path
-            # checking if it is a file
-            if os.path.isfile(filepath):
+        import os
+        import numpy as np
+        from multiprocessing import Pool
+        import multiprocessing
+        
+        
+        #for recording in self.recordings:
+        with Pool(processes=multiprocessing.cpu_count()-2) as pool:  # Use all available CPU cores
+            
+            #results = pool.starmap(self.processRecording, [(rec, inference) for rec in self.recordings])
+                results = pool.starmap(self.processRecording, [(rec, inference) for rec in self.recordings], chunksize=16)
 
-                embedding = inference(filepath)
+ 
+def getSampleNumber(filepath):
+        with wave.open(filepath, "r") as wf:
+            num_samples = wf.getnframes()
+        return num_samples
 
-                recording.audio2vecSave(embedding)
-                
-                fileCount+=1
-                print("filecount: ",fileCount)
-        print(f"All embeddings of {n} features, were created !")
-    
+def temp_fixWholeWindow(recordings):
+            # Checks if the recording isnt too short (Since some recordings had a feature extracting problem when file was under 1 sec) 
+            import soundfile as sf
+            # Load the audio
+            y, sr = librosa.load(filepath, sr=None)
+            duration = len(y) / sr  # Calculate duration in seconds
+            print(f"Original Duration: {duration} seconds")
+
+            # Ensure at least 1 second of audio
+            min_duration = 0.25  # Minimum required duration in seconds
+            if duration < min_duration:
+                padding = int(sr * min_duration) - len(y)  # Calculate padding length
+                y = np.pad(y, (0, padding), mode="constant")  # Pad with zeros
+                print(f"Padded Duration: {len(y) / sr} seconds!!!!!!!!!!!!!!!!!!!!")
+
+                # Save the padded file temporarily
+                temp_filepath = filepath.replace(".wav", "_padded.wav")
+                sf.write(temp_filepath, y, sr)
+                filepath = temp_filepath  # Update filepath to padded file
 
 
-pyannoteDB = Database()
-pyannoteDB.makePyannote()
-pyannoteDB.save("pyannote.csv")
+
+from multiprocessing import freeze_support
+if __name__ == '__main__':
+    freeze_support()  # Needed for Windows/macOS
+    pyannoteDB = Database()
+    pyannoteDB.makePyannote()
+    pyannoteDB.save("pyannote.csv")
