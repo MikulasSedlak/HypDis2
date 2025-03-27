@@ -120,6 +120,7 @@ def loadConfusionMatrix(databaseFilename): #TODO rename to CMfromDatabase
 
     print(databasePath," succesfully loaded.")
 
+#TODO:save matrixes in better format:
 def saveConfusionMatrix(filename, fileObjects):
     file ="resources/confusionMatrixes/" + filename
     f = open(file, "w")
@@ -217,17 +218,16 @@ class Database:
         model = Model.from_pretrained("pyannote/embedding", use_auth_token="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")
         inference = Inference(model, window="sliding")
         
-        import os
-        import numpy as np
         from multiprocessing import Pool
         import multiprocessing
         
         
         #for recording in self.recordings:
+        cpusUsed = processes=multiprocessing.cpu_count()-2
         with Pool(processes=multiprocessing.cpu_count()-2) as pool:  # Use all available CPU cores
             
             #results = pool.starmap(self.processRecording, [(rec, inference) for rec in self.recordings])
-                results = pool.starmap(self.processRecording, [(rec, inference) for rec in self.recordings], chunksize=16)
+                results = pool.starmap(self.processRecording, [(rec, inference) for rec in self.recordings], chunksize=int(len(self.recordings/cpusUsed)))
 
  
 def getSampleNumber(filepath):
