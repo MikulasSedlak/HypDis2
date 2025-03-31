@@ -16,6 +16,17 @@ SP2 = "/"
 SP3 = "_"
 testfilename = "resources/recordings/K/K1003/K1003_0.0_1.wav"
 
+##Yet unused
+#def get_unique_filename(filename):
+#        base, ext = os.path.splitext(filename)
+#        counter = 1
+#        while os.path.exists(filename):
+#            filename = f"{base}_{counter}{ext}"
+#            counter += 1
+#        return filename
+
+
+
 class Recording:
     def __init__(self,recording): #initialization is one line from files.csv, can be also initialized form other ".csv" databases
             #contains booleans: hasPD, isMale, 
@@ -55,8 +66,8 @@ class Recording:
         self.distanceFromKavg,self.distanceFromPavg,self.distanceFromKmed,self.distanceFromPmed = 0,0,0,0
 
     def audio2vecSave(self,audiovector):
-        self.audio2vec = audiovector
         audiovector = audiovector.tolist()
+        self.audio2vec = audiovector
         self.audio2vecStr = SP2.join(map(str,audiovector))
     
     #def wav2vecSave(self,audiovector):
@@ -154,12 +165,16 @@ class Database:
         print(databasePath," loaded.")
         return recordings
     
+    
+
+        
     def save(self, fileObjects=None):
         if fileObjects == "files.csv":
             raise NameError("Cannot save as files.csv")           
         if fileObjects is None:
             fileObjects = self.databaseFilename
         file ="resources/databases/" + fileObjects
+        #unique_filename = get_unique_filename("results.txt")
         f = open(file, "w")
         for recording in self.recordings:
             f.writelines([recording.path,SP1,recording.audio2vecStr,os.linesep])
@@ -196,7 +211,7 @@ class Database:
         self.recordings = recordings
     
     @staticmethod
-    def processRecording(recording, inference):
+    def makeRecording(recording, inference):
         filepath = recording.path
         # checking if it is a file
         if os.path.isfile(filepath):
@@ -204,10 +219,9 @@ class Database:
             #print("Samples: {n}", sampleCount)
             
             embedding = inference(filepath)
-            embedding =  np.median(embedding.data, axis=0)
-
+            embedding = np.median(embedding.data, axis=0)
             recording.audio2vecSave(embedding)
-            #Database.countFunc()
+            Database.countFunc()
 
     def makePyannote(self):
 
@@ -215,20 +229,37 @@ class Database:
         from pyannote.audio import Inference
 
         # Load pre-trained speaker embedding model
-        model = Model.from_pretrained("pyannote/embedding", use_auth_token="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")
+        model = Model.from_pretrained("pyannote/embedding", use_auth_token="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", revision="main", strict=False)
         inference = Inference(model, window="sliding")
         
-        from multiprocessing import Pool
-        import multiprocessing
         
-        
-        #for recording in self.recordings:
-        cpusUsed = processes=multiprocessing.cpu_count()-2
-        with Pool(processes=multiprocessing.cpu_count()-2) as pool:  # Use all available CPU cores
-            
-            #results = pool.starmap(self.processRecording, [(rec, inference) for rec in self.recordings])
-                results = pool.starmap(self.processRecording, [(rec, inference) for rec in self.recordings], chunksize=int(len(self.recordings/cpusUsed)))
+        #multithreading doesnt work  
 
+            #from multiprocessing import Pool
+            #import multiprocessing
+            #cpusUsed = multiprocessing.cpu_count()-2
+            
+            #with Pool(processes=multiprocessing.cpu_count()-2) as pool:  # Use all available CPU cores
+                #pool.starmap(self.makeRecording, [(rec, inference) for rec in self.recordings], chunksize=int(len(self.recordings)/cpusUsed))
+        for recording in self.recordings:
+           self.makeRecording(recording, inference)
+
+    def toTensor(self, labelsON=True): 
+        #returns matrix with embeddings and vector of labels (1 for has PD, -1 for CG)
+        matrix, labels = [], []
+        
+        for recording in self.recordings:
+            matrix.append(recording.audio2vec)
+            if recording.hasPD:
+                labels.append(1)
+            else:
+                labels.append(-1)
+        matrix = torch.stack(matrix)
+        labels = torch.tensor(labels)
+        if labelsON:
+            return matrix, labels
+        else:
+            return matrix
  
 def getSampleNumber(filepath):
         with wave.open(filepath, "r") as wf:
@@ -257,9 +288,9 @@ def temp_fixWholeWindow(recordings):
 
 
 
-from multiprocessing import freeze_support
-if __name__ == '__main__':
-    freeze_support()  # Needed for Windows/macOS
-    pyannoteDB = Database()
-    pyannoteDB.makePyannote()
-    pyannoteDB.save("pyannote.csv")
+#from multiprocessing import freeze_support
+#if __name__ == '__main__':
+#    freeze_support()  # Needed for Windows/macOS
+#    pyannoteDB = Database()
+#    pyannoteDB.makePyannote()
+#    pyannoteDB.save(fileObjects="pyannote.csv")

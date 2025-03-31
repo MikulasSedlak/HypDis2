@@ -25,16 +25,16 @@ def printspecialexcs(recordings,STR):
     print(f"ex. accuracy is {acuracy:.2f} ({acu}/{racy})")
 
 
-loadpath = "pyannote.csv"
-savepath = "mmm.csv"
+loadpath = "audio2vec512.csv"
+savepath = "MatrixTest.csv"
 
 #loads DB
-recordings = DB.Database.load(loadpath)
+database = DB.Database(loadpath)
 
 #creates matrixes,
 
 #TODO rec2Tensor doesnt exist
-X, y = DB.rec2Tensor(recordings)
+X, y = database.toTensor()
 
 perm = torch.randperm(y.size(0)) #random permutation
 X = X[perm]
@@ -73,7 +73,7 @@ for train_idx, test_idx in kfold.split(X, y):
     
     #add to the confusion matrix
     confusionMatrix += confusion_matrix(y_test, y_pred)
-
+ 
     #save info back into the recording
     
     for idx, true_label, pred_label in zip(test_idx, y_test, y_pred):
@@ -81,7 +81,7 @@ for train_idx, test_idx in kfold.split(X, y):
         single_conf_matrix = confusion_matrix([true_label], [pred_label], labels=[1, -1])
         
         # Save it to the corresponding recording
-        recordings[idx].saveConfusionMatrix(single_conf_matrix)
+        database.recordings[idx].saveConfusionMatrix(single_conf_matrix)
 
     # Store classification report for this fold
     classification_reports.append(classification_report(y_test, y_pred, output_dict=True))
@@ -94,7 +94,7 @@ for train_idx, test_idx in kfold.split(X, y):
 totalAcuraccy = 100*(confusionMatrix[0, 0] + confusionMatrix[1, 1])/np.sum(confusionMatrix)
 
 #save
-DB.saveConfusionMatrix(savepath,recordings)
+DB.saveConfusionMatrix(savepath,database.recordings)
 
 ##accuracy of exercies
 
@@ -153,8 +153,8 @@ def mfAccuracy(recordings):
     print("---------------------------------------------------")
 
 
-exerciseAccuracy(recordings)
-mfAccuracy(recordings)
+exerciseAccuracy(database.recordings)
+mfAccuracy(database.recordings)
 #Print the confusion matrix
 print("---------------------------------------------------")
 
@@ -171,9 +171,9 @@ recall = confusionMatrix[1,1] / (confusionMatrix[1,1] + confusionMatrix[1, 0])
 f1_score = 2 * (precision * recall) / (precision + recall)
 
 # Print results
-printspecialexcs(recordings, "7.")
-printspecialexcs(recordings, "8.")
-printspecialexcs(recordings, "9.")
+printspecialexcs(database.recordings, "7.")
+printspecialexcs(database.recordings, "8.")
+printspecialexcs(database.recordings, "9.")
 
 print("===================================================")
 print(f"Precision: {100*precision:.1f}")
