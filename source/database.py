@@ -260,6 +260,40 @@ class Database:
             return matrix, labels
         else:
             return matrix
+        
+    def sortRecExerc(self):
+        recordingsSorted = []
+        #FileCount = 0
+        for recording in self.recordings:
+            recordingAdded = False
+            if not recordingsSorted == []:
+                for recGroup in recordingsSorted:
+                    if recGroup[0].exerciseNumber == recording.exerciseNumber:
+                        recGroup.append(recording)
+                        recordingAdded = True
+                        break
+            if not recordingAdded:
+                recGroup = []
+                recordingsSorted.append(recGroup)
+                recordingsSorted[-1].append(recording)
+            #FileCount += 1
+            #print("File: ", FileCount, "/",len(recordings)) #checking print
+        return recordingsSorted
+
+    def splitGender(self): #takes group, returns two - F, M
+        M = []
+        F = []
+        countP = countK = 0
+        for recording in self.recordings:
+            if recording.isMale:
+                M.append(recording)
+                countP +=1
+            else:
+                F.append(recording)
+                countK +=1
+        return M,F
+    
+    
  
 def getSampleNumber(filepath):
         with wave.open(filepath, "r") as wf:

@@ -25,7 +25,60 @@ def printspecialexcs(recordings,STR):
     print(f"ex. accuracy is {acuracy:.2f} ({acu}/{racy})")
 
 
-loadpath = "audio2vec512.csv"
+class Accuracy:
+        
+    @classmethod
+    def exercises(self, database):
+        recordingsSortEx = database.sortRecExerc()
+
+        for exercise in recordingsSortEx:
+            exConfMatrix = np.zeros((2, 2), dtype=int)
+            accurate = 0
+            for recording in exercise:
+                exConfMatrix += recording.confMatrix
+                if recording.accurate:
+                    accurate+=1
+            exAccuracyP = 100*accurate/len(exercise)
+            print(f"Ex. {exercise[0].exerciseNumber} accuracy: {exAccuracyP:.2f} ({accurate}/{len(exercise)})")
+            print(f"TP: {exConfMatrix[1, 1]}", end="  ")
+            print(f"FN: {exConfMatrix[1, 0]}")
+            print(f"FP: {exConfMatrix[0, 1]}", end="  ")
+            print(f"TN: {exConfMatrix[0, 0]}")
+            print("---------------------------------------------------")
+
+    def mf(database):
+        M,F = database.splitGender()
+        mAcc, fAcc = 0,0
+        mCM,fCM = np.zeros((2, 2), dtype=int),np.zeros((2, 2), dtype=int)
+        for recording in M:
+            mCM += recording.confMatrix
+            if recording.accurate:
+                mAcc+=1
+        for recording in F:
+            fCM += recording.confMatrix
+            if recording.accurate:
+                fAcc+=1
+        mAccP = 100*mAcc/len(M)
+        fAccP = 100*fAcc/len(F)
+        print("---------------------------------------------------")
+        print(f"Male accuracy is {mAccP:.2f} ({mAcc}/{len(M)})")
+        print(f"Female accuracy is {fAccP:.2f} ({fAcc}/{len(F)})")
+        print("---------------------------------------------------")
+        print("Male CM:")
+        print(f"TP: {mCM[1, 1]}", end="  ")
+        print(f"FN: {mCM[1, 0]}")
+        print(f"FP: {mCM[0, 1]}", end="  ")
+        print(f"TN: {mCM[0, 0]}")
+        print("---------------------------------------------------")
+        print("Female CM:")
+        print(f"TP: {fCM[1, 1]}", end="  ")
+        print(f"FN: {fCM[1, 0]}")
+        print(f"FP: {fCM[0, 1]}", end="  ")
+        print(f"TN: {fCM[0, 0]}")
+        print("---------------------------------------------------")
+
+
+loadpath = "pyannote.csv"
 savepath = "MatrixTest.csv"
 
 #loads DB
@@ -33,7 +86,6 @@ database = DB.Database(loadpath)
 
 #creates matrixes,
 
-#TODO rec2Tensor doesnt exist
 X, y = database.toTensor()
 
 perm = torch.randperm(y.size(0)) #random permutation
@@ -45,10 +97,8 @@ X = torch.Tensor.numpy(X)
 #labels
 y = torch.Tensor.numpy(y)
 
-
-
 # Initialize 10-Fold Cross Validation
-#TODO needs to be stratified across People, not recordings
+#TODO needs to be stratified across People, not recordings!!!
 n_splits=10
 kfold = StratifiedKFold(n_splits, shuffle=True) #Shuffle = 
 
@@ -99,62 +149,10 @@ DB.saveConfusionMatrix(savepath,database.recordings)
 ##accuracy of exercies
 
 #sorts into list of exercises
-def exerciseAccuracy(recordings):
 
-    
-    recordingsSortEx = DB.sortRecExerc(recordings)
+Accuracy.exercises(database)
+Accuracy.mf(database)
 
-    for exercise in recordingsSortEx:
-        exConfMatrix = np.zeros((2, 2), dtype=int)
-        accurate = 0
-        for recording in exercise:
-            exConfMatrix += recording.confMatrix
-            if recording.accurate:
-                accurate+=1
-        exAccuracyP = 100*accurate/len(exercise)
-        print(f"Ex. {exercise[0].exerciseNumber} accuracy: {exAccuracyP:.2f} ({accurate}/{len(exercise)})")
-        print(f"TP: {exConfMatrix[1, 1]}", end="  ")
-        print(f"FN: {exConfMatrix[1, 0]}")
-        print(f"FP: {exConfMatrix[0, 1]}", end="  ")
-        print(f"TN: {exConfMatrix[0, 0]}")
-        print("---------------------------------------------------")
-
-
-
-def mfAccuracy(recordings):
-    M,F = DB.splitG(recordings)
-    mAcc, fAcc = 0,0
-    mCM,fCM = np.zeros((2, 2), dtype=int),np.zeros((2, 2), dtype=int)
-    for recording in M:
-        mCM += recording.confMatrix
-        if recording.accurate:
-            mAcc+=1
-    for recording in F:
-        fCM += recording.confMatrix
-        if recording.accurate:
-            fAcc+=1
-    mAccP = 100*mAcc/len(M)
-    fAccP = 100*fAcc/len(F)
-    print("---------------------------------------------------")
-    print(f"Male accuracy is {mAccP:.2f} ({mAcc}/{len(M)})")
-    print(f"Female accuracy is {fAccP:.2f} ({fAcc}/{len(F)})")
-    print("---------------------------------------------------")
-    print("Male CM:")
-    print(f"TP: {mCM[1, 1]}", end="  ")
-    print(f"FN: {mCM[1, 0]}")
-    print(f"FP: {mCM[0, 1]}", end="  ")
-    print(f"TN: {mCM[0, 0]}")
-    print("---------------------------------------------------")
-    print("Female CM:")
-    print(f"TP: {fCM[1, 1]}", end="  ")
-    print(f"FN: {fCM[1, 0]}")
-    print(f"FP: {fCM[0, 1]}", end="  ")
-    print(f"TN: {fCM[0, 0]}")
-    print("---------------------------------------------------")
-
-
-exerciseAccuracy(database.recordings)
-mfAccuracy(database.recordings)
 #Print the confusion matrix
 print("---------------------------------------------------")
 
@@ -180,8 +178,3 @@ print(f"Precision: {100*precision:.1f}")
 print(f"Recall: {100*recall:.1f}")
 print(f"F1 Score: {100*f1_score:.1f}")
 print("===================================================")
-
-
-
-            
-
