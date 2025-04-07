@@ -86,11 +86,12 @@ database = DB.Database(loadpath)
 
 #creates matrixes,
 
-X, y = database.toTensor()
+X, y, patientLabels = database.toTensor()
 
 perm = torch.randperm(y.size(0)) #random permutation
 X = X[perm]
 y = y[perm]
+patientLabels = patientLabels[perm]
 
 #features
 X = torch.Tensor.numpy(X)
@@ -100,14 +101,17 @@ y = torch.Tensor.numpy(y)
 # Initialize 10-Fold Cross Validation
 #TODO needs to be stratified across People, not recordings!!!
 n_splits=10
-kfold = StratifiedKFold(n_splits, shuffle=True) #Shuffle = 
+#kfold = GroupKFold(n_splits, shuffle=True) #Shuffle = 
+gkf = GroupKFold(n_splits=3)
+
 
 # Initialize metrics and results storage
 classification_reports = []
 confusionMatrix = np.zeros((2, 2), dtype=int)
 splitCount = 0
 # Iterate over each fold
-for train_idx, test_idx in kfold.split(X, y):
+#for train_idx, test_idx in kfold.split(X, y):
+for train_idx, test_idx in gkf.split(X, y, patientLabels):
 
     #split data
     X_train, X_test = X[train_idx], X[test_idx]

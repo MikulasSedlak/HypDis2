@@ -259,20 +259,30 @@ class Database:
 
     def toTensor(self, labelsON=True): 
         #returns matrix with embeddings and vector of labels (1 for has PD, -1 for CG)
-        matrix, labels = [], []
+        matrix, labels, patientLabels = [], [], []
+        personsUsed = []
         
         for recording in self.recordings:
             matrix.append(recording.audio2vec)
+            #add labels
             if recording.hasPD:
                 labels.append(1)
             else:
                 labels.append(-1)
+
+            #add personLabels
+            if not recording.patientNumber in personsUsed:
+                personsUsed.append(recording.patientNumber)
+            patientLabels.append(personsUsed.index(recording.patientNumber))
+            
         matrix = torch.stack(matrix)
         labels = torch.tensor(labels)
+        patientLabels = torch.tensor(patientLabels)
         if labelsON:
-            return matrix, labels
+            return matrix, labels, patientLabels
+        
         else:
-            return matrix
+            return matrix,
         
     def sortRecExerc(self):
         recordingsSorted = []
@@ -335,9 +345,9 @@ def temp_fixWholeWindow(recordings):
 
 
 
-from multiprocessing import freeze_support
-if __name__ == '__main__':
-    freeze_support()  # Needed for Windows/macOS
-    pyannoteDB = Database()
+#from multiprocessing import freeze_support
+#if __name__ == '__main__':
+#    freeze_support()  # Needed for Windows/macOS
+#    pyannoteDB = Database()
 #    pyannoteDB.makePyannote()
 #    pyannoteDB.save(fileObjects="pyannote.csv")
