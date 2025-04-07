@@ -140,19 +140,21 @@ def saveConfusionMatrix(filename, fileObjects):
       f.writelines([str(recording.path),SP1,matrixStr,os.linesep])
     f.close()
 
+class Patient:
+    def __init__(self, recording):
+        self.hasPD = recording.hasPD
+        self.isMale = recording.isMale
+        self.number = recording.patientNumber
+        self.recordingsList = []
+        self.recordingsList.append(recording)
 
 
 
 class Database:
-    count = 0
     def __init__(self,databaseFilename="files.csv"):
         self.recordings = self.load(databaseFilename)
         self.databaseFilename = databaseFilename
-        self.count = 0
-    @staticmethod
-    def countFunc():
-        Database.count +=1
-        print("count: ", Database.count)
+        self.patients = self.loadPatients()
     
 
     def load(self,databaseFile):
@@ -164,7 +166,19 @@ class Database:
                 recordings.append(Recording(line.strip()))
         print(databasePath," loaded.")
         return recordings
+
+    def loadPatients(self):
+        patientList = []
+        
+        for recording in self.recordings:
+            if  any(patient.number == recording.patientNumber for patient in patientList):
+                patientList[-1].recordingsList.append(recording)
+            else:
+                patientList.append(Patient(recording))
+                patientsCount = len(patientList)
+        return patientList
     
+
     
 
         
@@ -221,7 +235,6 @@ class Database:
             embedding = inference(filepath)
             embedding = np.median(embedding.data, axis=0)
             recording.audio2vecSave(embedding)
-            Database.countFunc()
 
     def makePyannote(self):
 
@@ -322,9 +335,9 @@ def temp_fixWholeWindow(recordings):
 
 
 
-#from multiprocessing import freeze_support
-#if __name__ == '__main__':
-#    freeze_support()  # Needed for Windows/macOS
-#    pyannoteDB = Database()
+from multiprocessing import freeze_support
+if __name__ == '__main__':
+    freeze_support()  # Needed for Windows/macOS
+    pyannoteDB = Database()
 #    pyannoteDB.makePyannote()
 #    pyannoteDB.save(fileObjects="pyannote.csv")

@@ -1,6 +1,6 @@
 # Import necessary libraries
 import numpy as np
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, GroupKFold
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import LinearSVC
 from sklearn.metrics import confusion_matrix, classification_report,  precision_score, recall_score, f1_score
