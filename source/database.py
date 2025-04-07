@@ -25,7 +25,7 @@ testfilename = "resources/recordings/K/K1003/K1003_0.0_1.wav"
 #            counter += 1
 #        return filename
 
-
+#TODO class CM, that calculates Precison, Recall, F1 score...
 
 class Recording:
     def __init__(self,recording): #initialization is one line from files.csv, can be also initialized form other ".csv" databases

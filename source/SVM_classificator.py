@@ -104,7 +104,7 @@ X = torch.Tensor.numpy(X)
 y = torch.Tensor.numpy(y)
 
 # Initialize 10-Fold Cross Validation
-#TODO needs to be stratified across People, not recordings!!!
+
 n_splits=10
 
 
