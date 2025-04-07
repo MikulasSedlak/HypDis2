@@ -77,6 +77,9 @@ class Accuracy:
         print(f"TN: {fCM[0, 0]}")
         print("---------------------------------------------------")
 
+    def random(database):
+        text = 0
+
 
 loadpath = "pyannote.csv"
 savepath = "MatrixTest.csv"
@@ -88,6 +91,8 @@ database = DB.Database(loadpath)
 
 X, y, patientLabels = database.toTensor()
 
+#maybe unnecessary, shuffles before creating the folds
+torch.manual_seed(42)
 perm = torch.randperm(y.size(0)) #random permutation
 X = X[perm]
 y = y[perm]
@@ -101,6 +106,8 @@ y = torch.Tensor.numpy(y)
 # Initialize 10-Fold Cross Validation
 #TODO needs to be stratified across People, not recordings!!!
 n_splits=10
+
+
 #kfold = GroupKFold(n_splits, shuffle=True) #Shuffle = 
 gkf = GroupKFold(n_splits=3)
 
