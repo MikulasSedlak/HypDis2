@@ -27,6 +27,63 @@ testfilename = "resources/recordings/K/K1003/K1003_0.0_1.wav"
 
 #TODO class CM, that calculates Precison, Recall, F1 score...
 
+class CM:
+    def __init__(self, matrix):
+        if not self.correctSize(matrix):
+            raise TypeError("Matrix size must be 2x2!")
+        self.matrix = self.correctMatrix(matrix)
+
+    def precision(self):
+        TP, FN = self.matrix[0]
+        FP, TN = self.matrix[1]
+        if TP + FP == 0:
+            return 0.0
+        return TP / (TP + FP)
+
+    def recall(self):
+        TP, FN = self.matrix[0]
+        FP, TN = self.matrix[1]
+        if TP + FN == 0:
+            return 0.0
+        return TP / (TP + FN)
+
+    def f1score(self):
+        p = self.precision()
+        r = self.recall()
+        if p + r == 0:
+            return 0.0
+        return 2 * (p * r) / (p + r)
+    
+    def correctMatrix(matrix):
+        # Convert numpy arrays to list
+        if isinstance(matrix, np.ndarray):
+            matrix = matrix.tolist()
+        
+        # Convert torch tensors to list
+        else: 
+            if isinstance(matrix, torch.Tensor):
+                matrix = matrix.tolist()
+        
+        # Validate structure
+        if not isinstance(matrix, list):
+            raise TypeError("Matrix must be a list, numpy.ndarray, or torch.Tensor.")
+        
+        if len(matrix) != 2:
+            raise ValueError("Matrix must have exactly 2 rows.")
+        
+        for i, row in enumerate(matrix):
+            if not isinstance(row, list):
+                raise TypeError(f"Row {i} is not a list.")
+            if len(row) != 2:
+                raise ValueError(f"Row {i} must have exactly 2 elements.")
+            for j, val in enumerate(row):
+                if not isinstance(val, (int, float)):
+                    raise TypeError(f"Element at position [{i}][{j}] must be an int or float.")
+        
+        return matrix  # return the validated and converted matrix
+    
+            
+
 class Recording:
     def __init__(self,recording): #initialization is one line from files.csv, can be also initialized form other ".csv" databases
             #contains booleans: hasPD, isMale, 
