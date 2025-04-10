@@ -31,8 +31,16 @@ class CM:
     def __init__(self, matrix):
         if not self.correctSize(matrix):
             raise TypeError("Matrix size must be 2x2!")
-        self.matrix = self.correctMatrix(matrix)
-
+        self.matrix = self.formatMatrix(matrix)
+        return self.matrix
+    
+    def __call__(self):
+        return self.matrix
+    
+    def __add__(self, other):
+        newMatrix = np.array(self.matrix) + np.array(other.matrix)
+        return CM(newMatrix)
+    
     def precision(self):
         TP, FN = self.matrix[0]
         FP, TN = self.matrix[1]
@@ -54,7 +62,7 @@ class CM:
             return 0.0
         return 2 * (p * r) / (p + r)
     
-    def correctMatrix(matrix):
+    def formatMatrix(matrix):
         # Convert numpy arrays to list
         if isinstance(matrix, np.ndarray):
             matrix = matrix.tolist()
@@ -81,6 +89,11 @@ class CM:
                     raise TypeError(f"Element at position [{i}][{j}] must be an int or float.")
         
         return matrix  # return the validated and converted matrix
+    
+    def isAccurate(self):
+        if self.matrix[0][0] == 1 or self.matrix[1][1] == 1:
+            return True
+        return False
     
             
 
@@ -133,6 +146,7 @@ class Recording:
     #def pyannoteSave(self,audiovector):
     #    self.pyannoteVec = audiovector
 
+    #TODO use CM
     def saveConfusionMatrix(self,singleConfMatrix):
         self.confMatrix = singleConfMatrix
         if singleConfMatrix[0,0] == 1 or singleConfMatrix[1,1] == 1:
