@@ -222,13 +222,15 @@ class Patient:
 
 
 class Database:
-    def __init__(self,databaseFilename="files.csv"):
-        self.recordings = self.load(databaseFilename)
-        self.databaseFilename = databaseFilename
-        self.patients = self.loadPatients()
-    
+    def __init__(self):
+        pass    
 
-    def load(self,databaseFile):
+    def make(self,recordings):
+        self.recordings = recordings
+        self.patients = self.loadPatients()
+
+    def load(self,databaseFile="files.csv"):
+        self.databaseFilename = databaseFile
         print("loading ", databaseFile, "...")
         databasePath ="resources/databases/" + databaseFile
         recordings = []
@@ -236,7 +238,9 @@ class Database:
             for line in openfileobject:
                 recordings.append(Recording(line.strip()))
         print(databasePath," loaded.")
-        return recordings
+
+        self.recordings = recordings
+        self.patients = self.loadPatients()
 
     def loadPatients(self):
         patientList = []
@@ -374,17 +378,17 @@ class Database:
             #print("File: ", FileCount, "/",len(recordings)) #checking print
         return recordingsSorted
 
-    def splitGender(self): #takes group, returns two - F, M
+    def splitGender(self): #takes group, returns two - M,F
         M = []
         F = []
-        countP = countK = 0
+        countM = countF = 0
         for recording in self.recordings:
             if recording.isMale:
                 M.append(recording)
-                countP +=1
+                countM +=1
             else:
                 F.append(recording)
-                countK +=1
+                countF +=1
         return M,F
     
     

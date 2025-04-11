@@ -85,7 +85,8 @@ loadpath = "pyannote.csv"
 savepath = "MatrixTest.csv"
 
 #loads DB
-database = DB.Database(loadpath)
+database = DB.Database()
+database.load(loadpath)
 
 #creates matrixes,
 
@@ -136,8 +137,9 @@ for train_idx, test_idx in gkf.split(X, y, patientLabels):
     confusionMatrix += confusion_matrix(y_test, y_pred)
  
     #save info back into the recording
-    
+
     for idx, true_label, pred_label in zip(test_idx, y_test, y_pred):
+
         # Compute the confusion matrix for this single prediction
         single_conf_matrix = confusion_matrix([true_label], [pred_label], labels=[1, -1])
         
@@ -164,10 +166,8 @@ DB.saveConfusionMatrix(savepath,database.recordings)
 Accuracy.exercises(database)
 Accuracy.mf(database)
 
-#Print the confusion matrix
+#print CM
 print("---------------------------------------------------")
-
-# Optionally format it for readability
 print("Confusion Matrix:")
 print(f"TP: {confusionMatrix[1, 1]}", end="  ")
 print(f"FN: {confusionMatrix[1, 0]}")
