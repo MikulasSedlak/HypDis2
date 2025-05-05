@@ -1,6 +1,6 @@
 # Import necessary libraries
 import numpy as np
-from sklearn.model_selection import StratifiedKFold, GroupKFold
+from sklearn.model_selection import StratifiedKFold, GroupKFold, StratifiedGroupKFold
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import LinearSVC
 from sklearn.metrics import confusion_matrix, classification_report,  precision_score, recall_score, f1_score
@@ -104,13 +104,14 @@ X = torch.Tensor.numpy(X)
 #labels
 y = torch.Tensor.numpy(y)
 
-# Initialize 10-Fold Cross Validation
+yDiagnosis = np.array([label % 10 for label in y])
 
-n_splits=10
+#kfold Cross Validation
 
+k_splits=3
 
 #kfold = GroupKFold(n_splits, shuffle=True) #Shuffle = 
-gkf = GroupKFold(n_splits=3)
+gkf = StratifiedGroupKFold(k_splits)
 
 
 # Initialize metrics and results storage
@@ -123,7 +124,7 @@ for train_idx, test_idx in gkf.split(X, y, patientLabels):
 
     #split data
     X_train, X_test = X[train_idx], X[test_idx]
-    y_train, y_test = y[train_idx], y[test_idx]
+    y_train, y_test = yDiagnosis[train_idx], yDiagnosis[test_idx]
     
     #SVM training
     #model = LinearSVC(C=10.0, max_iter=1000) # Example parameters
@@ -141,18 +142,15 @@ for train_idx, test_idx in gkf.split(X, y, patientLabels):
     for idx, true_label, pred_label in zip(test_idx, y_test, y_pred):
 
         # Compute the confusion matrix for this single prediction
-        single_conf_matrix = confusion_matrix([true_label], [pred_label], labels=[1, -1])
+        single_conf_matrix = confusion_matrix([true_label], [pred_label], labels=[1, 0])
         
         # Save it to the corresponding recording
         database.recordings[idx].saveConfusionMatrix(single_conf_matrix)
 
-    # Store classification report for this fold
-    classification_reports.append(classification_report(y_test, y_pred, output_dict=True))
-
     #store classification report
-    classification_reports.append(classification_report(y_test, y_pred, output_dict=True))
+    #classification_reports.append(classification_report(y_test, y_pred, output_dict=True))
     splitCount+=1
-    print(f"Done {splitCount}/{n_splits}")
+    print(f"Done {splitCount}/{k_splits}")
 
 totalAcuraccy = 100*(confusionMatrix[0, 0] + confusionMatrix[1, 1])/np.sum(confusionMatrix)
 

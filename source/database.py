@@ -340,10 +340,12 @@ class Database:
         for recording in self.recordings:
             matrix.append(recording.audio2vec)
             #add labels
+            ylabel = 0
             if recording.hasPD:
-                labels.append(1)
-            else:
-                labels.append(-1)
+                ylabel=1
+            if recording.isMale:
+                ylabel+=10
+            labels.append(ylabel)
 
             #add personLabels
             if not recording.patientNumber in personsUsed:
