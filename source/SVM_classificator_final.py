@@ -1,39 +1,18 @@
-# Import necessary libraries
-import numpy as np
-from sklearn.model_selection import StratifiedKFold, GroupKFold, StratifiedGroupKFold
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.svm import LinearSVC
-from sklearn.metrics import confusion_matrix, classification_report,  precision_score, recall_score, f1_score
-
 import database as DB
 import torch
+from sklearn.model_selection import StratifiedKFold, GroupKFold, StratifiedGroupKFold
+from sklearn.svm import SVC
+import numpy as np
+from sklearn.metrics import confusion_matrix
 
-def printspecialexcs(recordings,STR):
-    cm = np.zeros((2, 2), dtype=int)
-    for exercise in recordings:
-        if STR in exercise.exerciseNumber:
-            cm += exercise.confMatrix
-    acu = (cm[1, 1]+cm[0,0])
-    racy= (cm[1, 1]+cm[0,0]+cm[1, 0]+cm[0, 1])
-    acuracy = acu/racy
-    print("===================================================")
-    print(STR," ex. confusion Matrix:")
-    print(f"TP: {cm[1, 1]}", end="  ")
-    print(f"FN: {cm[1, 0]}")
-    print(f"FP: {cm[0, 1]}", end="  ")
-    print(f"TN: {cm[0, 0]}")
-    print(f"ex. accuracy is {acuracy:.2f} ({acu}/{racy})")
-
-
-
-
-
-loadpath = "VGGish.csv"
-savepath = "VGGish_CM.csv"
+#filenames
+loadpath = "pyannote.csv"
+savepath = "VGGish_CM_SVM.csv"
 
 #loads DB
 database = DB.Database()
 database.load(loadpath)
+
 
 #creates matrixes,
 
@@ -75,7 +54,7 @@ for train_idx, test_idx in gkf.split(X, y, patientLabels):
     
     #SVM training
     #model = LinearSVC(C=10.0, max_iter=1000) # Example parameters
-    model = RandomForestClassifier(n_estimators=100, max_depth=None, random_state=42)
+    model = SVC(kernel='linear', C=1.0)
     model.fit(X_train, y_train)
     
     #predictions
@@ -99,14 +78,7 @@ for train_idx, test_idx in gkf.split(X, y, patientLabels):
     splitCount+=1
     print(f"Done {splitCount}/{k_splits}")
 
-totalAcuraccy = 100*(confusionMatrix[0, 0] + confusionMatrix[1, 1])/np.sum(confusionMatrix)
-
-#save
-database.saveConfusionMatrixes()
-
-##accuracy of exercies
-
-#sorts into list of exercises
+    #sorts into list of exercises
 
 DB.Database.Accuracy.exercises(database)
 DB.Database.Accuracy.mf(database)
@@ -118,19 +90,3 @@ print(f"TP: {confusionMatrix[1, 1]}", end="  ")
 print(f"FN: {confusionMatrix[1, 0]}")
 print(f"FP: {confusionMatrix[0, 1]}", end="  ")
 print(f"TN: {confusionMatrix[0, 0]}")
-
-# Calculate metrics
-precision = confusionMatrix[1,1] / (confusionMatrix[1,1] + confusionMatrix[0, 1])
-recall = confusionMatrix[1,1] / (confusionMatrix[1,1] + confusionMatrix[1, 0])
-f1_score = 2 * (precision * recall) / (precision + recall)
-
-# Print results
-printspecialexcs(database.recordings, "7.")
-printspecialexcs(database.recordings, "8.")
-printspecialexcs(database.recordings, "9.")
-
-print("===================================================")
-print(f"Precision: {100*precision:.1f}")
-print(f"Recall: {100*recall:.1f}")
-print(f"F1 Score: {100*f1_score:.1f}")
-print("===================================================")

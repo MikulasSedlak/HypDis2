@@ -1,4 +1,8 @@
 import os
+import tensorflow as tf
+import tensorflow_hub as hub
+import soundfile as sf
+import resampy
 import pyannote.audio
 import pyannote.pipeline
 import torch
@@ -136,7 +140,8 @@ class Recording:
         self.distanceFromKavg,self.distanceFromPavg,self.distanceFromKmed,self.distanceFromPmed = 0,0,0,0
 
     def audio2vecSave(self,audiovector):
-        audiovector = audiovector.tolist()
+        if not isinstance(audiovector, list):
+            audiovector = audiovector.tolist()
         self.audio2vec = audiovector
         self.audio2vecStr = SP2.join(map(str,audiovector))
     
@@ -180,37 +185,6 @@ def get_all_file_paths(dir="resources/recordings"):   #filepaths = get_all_file_
     return file_paths 
 
 
-
-def loadConfusionMatrix(databaseFilename): #TODO rename to CMfromDatabase
-    print("loading ", databaseFilename, "...")
-    databasePath ="resources/Confusion_matrixes/" + databaseFilename
-    recordings = []
-    with open(databasePath, "r") as openfileobject:
-        for line in openfileobject:
-
-            #splits into path
-            linestr = line.strip()
-            linestr= linestr.split(SP1)
-
-            #creates recording
-            recordings.append(Recording(linestr[0]))
-            
-            #create and save Conf matrix
-            linestr = linestr[1].split(SP2)
-            linestr.pop(0)
-            recordings[-1].saveConfusionMatrix([[int(linestr[0])],[linestr[1]]],[[linestr[2]],[linestr[3]]])
-
-    print(databasePath," succesfully loaded.")
-
-#TODO:save matrixes in better format:
-def saveConfusionMatrix(filename, fileObjects):
-    file ="resources/confusionMatrixes/" + filename
-    f = open(file, "w")
-    for recording in fileObjects:
-      matrixStr = SP2.join(map(str,recording.confMatrix))
-      f.writelines([str(recording.path),SP1,matrixStr,os.linesep])
-    f.close()
-
 class Patient:
     def __init__(self, recording):
         self.hasPD = recording.hasPD
@@ -231,6 +205,8 @@ class Database:
 
     def load(self,databaseFile="files.csv"):
         self.databaseFilename = databaseFile
+        name = databaseFile.split(".")
+        self.name = name[0]
         print("loading ", databaseFile, "...")
         databasePath ="resources/databases/" + databaseFile
         recordings = []
@@ -254,8 +230,6 @@ class Database:
         return patientList
     
 
-    
-
         
     def save(self, fileObjects=None):
         if fileObjects == "files.csv":
@@ -269,6 +243,36 @@ class Database:
             f.writelines([recording.path,SP1,recording.audio2vecStr,os.linesep])
         f.close()
         print("Database has been saved to file", fileObjects)
+
+    def loadConfusionMatrixes(self): #TODO rename to CMfromDatabase
+        filename = self.name + "_CM" + ".csv"
+        print("loading ", self.databaseFilename, "...")
+        databasePath ="resources/Confusion_matrixes/" + filename
+        with open(databasePath, "r") as openfileobject:
+            for line in openfileobject:
+
+                #splits into path
+                linestr = line.strip()
+                linestr= linestr.split(SP1)
+                idx = next((i for i, recording in enumerate(self.recordings) if recording.path == linestr[0]), ValueError(f"Recording with path {linestr[0]} not found."))
+
+                #create and save Conf matrix
+                values = linestr[1].split(SP2)
+                newMatrix = [[int(values[0]),int(values[1])],[int(values[2]),int(values[3])]]
+                self.recordings[idx].saveConfusionMatrix(newMatrix)
+
+        print(f"{filename} succesfully made.")
+
+    #TODO:save matrixes in better format:
+    def saveConfusionMatrixes(self):
+        file ="resources/confusionMatrixes/" + self.name +"_CM" + ".csv"
+        f = open(file, "w")
+        for recording in self.recordings:
+            if recording.accurate is None:
+                ValueError("Conf. Matrix cannot be saved.")
+            matrixStr = SP2.join(map(str,[item for sublist in recording.confMatrix for item in sublist]))
+            f.writelines([str(recording.path),SP1,matrixStr,os.linesep])
+        f.close()
 
 
     def makeAudio2Vec(self, n,recordings):
@@ -332,6 +336,48 @@ class Database:
         for recording in self.recordings:
            self.makeRecording(recording, inference)
 
+    def makeVGGish(self):
+        def load_audio(file_path, target_sr=16000):
+            audio, sr = sf.read(file_path)
+            if sr != target_sr:
+                audio = resampy.resample(audio, sr, target_sr)
+            if audio.ndim > 1:
+                audio = np.mean(audio, axis=1)  #convert to mono
+            import numpy as np
+
+            #minimum length is 1 s
+            if len(audio) < target_sr:
+                pad_width = target_sr - len(audio)
+                audio = np.pad(audio, (0, pad_width), mode='constant')
+            return audio
+
+        # Load VGGish model from TF Hub
+        model = hub.load('https://tfhub.dev/google/vggish/1')
+        count = 0
+        # Process audio and get embeddings
+        for recording in self.recordings:
+            audio = load_audio(recording.path)
+            audioTensor = tf.convert_to_tensor(audio, dtype=tf.float32)
+
+            # Add batch dimension and get embeddings
+            
+            embedding = model(audioTensor)
+
+
+            # Check if there are NaN or Inf values in the audio
+            
+            #print(f"COUNT:{count}")
+            #print("Embedding shape:", embedding.shape)
+            embedding = tf.reduce_mean(embedding, axis=0) #pooling
+            if np.any(np.isnan(embedding)) or np.any(np.isinf(embedding)):
+                raise TypeError("Embedding contains NaNs or Infs!")
+                #print("Embedding shape:", embedding.shape)
+            embedding = embedding.numpy().tolist()
+            recording.audio2vecSave(embedding)
+            #print("")
+            #count+=1
+
+
     def toTensor(self, labelsON=True): 
         #returns matrix with embeddings and vector of labels (1 for has PD, -1 for CG)
         matrix, labels, patientLabels = [], [], []
@@ -393,6 +439,59 @@ class Database:
                 countF +=1
         return M,F
     
+    class Accuracy:
+            
+        @classmethod
+        def exercises(self, database):
+            recordingsSortEx = database.sortRecExerc()
+
+            for exercise in recordingsSortEx:
+                exConfMatrix = np.zeros((2, 2), dtype=int)
+                accurate = 0
+                for recording in exercise:
+                    exConfMatrix += recording.confMatrix
+                    if recording.accurate:
+                        accurate+=1
+                exAccuracyP = 100*accurate/len(exercise)
+                print(f"Ex. {exercise[0].exerciseNumber} accuracy: {exAccuracyP:.2f} ({accurate}/{len(exercise)})")
+                print(f"TP: {exConfMatrix[1, 1]}", end="  ")
+                print(f"FN: {exConfMatrix[1, 0]}")
+                print(f"FP: {exConfMatrix[0, 1]}", end="  ")
+                print(f"TN: {exConfMatrix[0, 0]}")
+                print("---------------------------------------------------")
+
+        def mf(self,database):
+            M,F = database.splitGender()
+            mAcc, fAcc = 0,0
+            mCM,fCM = np.zeros((2, 2), dtype=int),np.zeros((2, 2), dtype=int)
+            for recording in M:
+                mCM += recording.confMatrix
+                if recording.accurate:
+                    mAcc+=1
+            for recording in F:
+                fCM += recording.confMatrix
+                if recording.accurate:
+                    fAcc+=1
+            mAccP = 100*mAcc/len(M)
+            fAccP = 100*fAcc/len(F)
+            print("---------------------------------------------------")
+            print(f"Male accuracy is {mAccP:.2f} ({mAcc}/{len(M)})")
+            print(f"Female accuracy is {fAccP:.2f} ({fAcc}/{len(F)})")
+            print("---------------------------------------------------")
+            print("Male CM:")
+            print(f"TP: {mCM[1, 1]}", end="  ")
+            print(f"FN: {mCM[1, 0]}")
+            print(f"FP: {mCM[0, 1]}", end="  ")
+            print(f"TN: {mCM[0, 0]}")
+            print("---------------------------------------------------")
+            print("Female CM:")
+            print(f"TP: {fCM[1, 1]}", end="  ")
+            print(f"FN: {fCM[1, 0]}")
+            print(f"FP: {fCM[0, 1]}", end="  ")
+            print(f"TN: {fCM[0, 0]}")
+            print("---------------------------------------------------")
+
+        
     
  
 def getSampleNumber(filepath):
@@ -428,3 +527,7 @@ def temp_fixWholeWindow(recordings):
 #    pyannoteDB = Database()
 #    pyannoteDB.makePyannote()
 #    pyannoteDB.save(fileObjects="pyannote.csv")
+#    pyannoteDB = Database()
+#    pyannoteDB.load("pyannote.csv")
+#    pyannoteDB.loadConfusionMatrixes()
+#    print(pyannoteDB.recordings[0].accuracy)
