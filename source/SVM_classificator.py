@@ -8,129 +8,109 @@ from sklearn.metrics import confusion_matrix, classification_report,  precision_
 import database as DB
 import torch
 
-def printspecialexcs(recordings,STR):
-    cm = np.zeros((2, 2), dtype=int)
-    for exercise in recordings:
-        if STR in exercise.exerciseNumber:
-            cm += exercise.confMatrix
-    acu = (cm[1, 1]+cm[0,0])
-    racy= (cm[1, 1]+cm[0,0]+cm[1, 0]+cm[0, 1])
-    acuracy = acu/racy
-    print("===================================================")
-    print(STR," ex. confusion Matrix:")
-    print(f"TP: {cm[1, 1]}", end="  ")
-    print(f"FN: {cm[1, 0]}")
-    print(f"FP: {cm[0, 1]}", end="  ")
-    print(f"TN: {cm[0, 0]}")
-    print(f"ex. accuracy is {acuracy:.2f} ({acu}/{racy})")
+
+
+def randForest(database):
+
+    #creates matrixes
+    X, y, patientLabels = database.toTensor()
+
+    #maybe unnecessary, shuffles before creating the folds
+    torch.manual_seed(42)
+    perm = torch.randperm(y.size(0)) #random permutation
+    X = X[perm]
+    y = y[perm]
+    patientLabels = patientLabels[perm]
+
+    #features
+    X = torch.Tensor.numpy(X)
+    #labels
+    y = torch.Tensor.numpy(y)
+
+    yDiagnosis = np.array([label % 10 for label in y])
+
+    #kfold Cross Validation
+
+    k_splits=10
+
+    #kfold = GroupKFold(n_splits, shuffle=True) #Shuffle = 
+    gkf = StratifiedGroupKFold(k_splits)
+
+
+    splitCount = 0
+    # Iterate over each fold
+    #for train_idx, test_idx in kfold.split(X, y):
+    for train_idx, test_idx in gkf.split(X, y, patientLabels):
+
+        #split data
+        X_train, X_test = X[train_idx], X[test_idx]
+        y_train, y_test = yDiagnosis[train_idx], yDiagnosis[test_idx]
+        
+        #random forest
+        model = RandomForestClassifier(n_estimators=100, max_depth=None, random_state=42)
+        model.fit(X_train, y_train)
+        
+        #predictions
+        y_pred = model.predict(X_test)
+        
+        #add to the confusion matrix
+        #database.confusionMatrix += confusion_matrix(y_test, y_pred)
+
+        #save info back into the recording
+
+        for idx, true_label, pred_label in zip(test_idx, y_test, y_pred):
+
+            # Compute the confusion matrix for this single prediction
+            single_conf_matrix = confusion_matrix([true_label], [pred_label], labels=[0, 1])
+            # Save it to the corresponding recording
+            database.recordings[idx].saveConfusionMatrix(single_conf_matrix)
+
+        splitCount+=1
+        
+        if __debug__:
+            print(f"Done {splitCount}/{k_splits}") 
+    
+
+
+    #save
+    database.saveConfusionMatrixes()
 
 
 
-
-
-loadpath = "VGGish.csv"
-savepath = "VGGish_CM.csv"
-
+#for loadpath in DB.loadpaths:
+loadpath = "pyannote.csv"
 #loads DB
 database = DB.Database()
 database.load(loadpath)
 
-#creates matrixes,
+#load model
+database.loadConfusionMatrixes()
 
-X, y, patientLabels = database.toTensor()
+#create model
+#randForest(database)
 
-#maybe unnecessary, shuffles before creating the folds
-torch.manual_seed(42)
-perm = torch.randperm(y.size(0)) #random permutation
-X = X[perm]
-y = y[perm]
-patientLabels = patientLabels[perm]
-
-#features
-X = torch.Tensor.numpy(X)
-#labels
-y = torch.Tensor.numpy(y)
-
-yDiagnosis = np.array([label % 10 for label in y])
-
-#kfold Cross Validation
-
-k_splits=10
-
-#kfold = GroupKFold(n_splits, shuffle=True) #Shuffle = 
-gkf = StratifiedGroupKFold(k_splits)
-
-
-#initialize and results storage
-classification_reports = []
-confusionMatrix = np.zeros((2, 2), dtype=int)
-splitCount = 0
-# Iterate over each fold
-#for train_idx, test_idx in kfold.split(X, y):
-for train_idx, test_idx in gkf.split(X, y, patientLabels):
-
-    #split data
-    X_train, X_test = X[train_idx], X[test_idx]
-    y_train, y_test = yDiagnosis[train_idx], yDiagnosis[test_idx]
-    
-    #SVM training
-    #model = LinearSVC(C=10.0, max_iter=1000) # Example parameters
-    model = RandomForestClassifier(n_estimators=100, max_depth=None, random_state=42)
-    model.fit(X_train, y_train)
-    
-    #predictions
-    y_pred = model.predict(X_test)
-    
-    #add to the confusion matrix
-    confusionMatrix += confusion_matrix(y_test, y_pred)
- 
-    #save info back into the recording
-
-    for idx, true_label, pred_label in zip(test_idx, y_test, y_pred):
-
-        # Compute the confusion matrix for this single prediction
-        single_conf_matrix = confusion_matrix([true_label], [pred_label], labels=[1, 0])
-        
-        # Save it to the corresponding recording
-        database.recordings[idx].saveConfusionMatrix(single_conf_matrix)
-
-    #store classification report
-    #classification_reports.append(classification_report(y_test, y_pred, output_dict=True))
-    splitCount+=1
-    print(f"Done {splitCount}/{k_splits}")
-
-totalAcuraccy = 100*(confusionMatrix[0, 0] + confusionMatrix[1, 1])/np.sum(confusionMatrix)
-
-#save
-database.saveConfusionMatrixes()
-
-##accuracy of exercies
 
 #sorts into list of exercises
+#DB.Database.Accuracy.mf(database)
 
-DB.Database.Accuracy.exercises(database)
-DB.Database.Accuracy.mf(database)
+#print exercises
+#database.Accuracy.exercises(database)
+#database.Accuracy.printspecialexcs(database, "7.")
+#database.Accuracy.printspecialexcs(database, "8.")
+#database.Accuracy.printspecialexcs(database, "9.")
 
-#print CM
-print("---------------------------------------------------")
-print("Confusion Matrix:")
-print(f"TP: {confusionMatrix[1, 1]}", end="  ")
-print(f"FN: {confusionMatrix[1, 0]}")
-print(f"FP: {confusionMatrix[0, 1]}", end="  ")
-print(f"TN: {confusionMatrix[0, 0]}")
+#database.Accuracy.printMetrics(database)
+#print("========================================================")
 
-# Calculate metrics
-precision = confusionMatrix[1,1] / (confusionMatrix[1,1] + confusionMatrix[0, 1])
-recall = confusionMatrix[1,1] / (confusionMatrix[1,1] + confusionMatrix[1, 0])
-f1_score = 2 * (precision * recall) / (precision + recall)
+#DB.Database.Accuracy.sortExercises(database)
 
-# Print results
-printspecialexcs(database.recordings, "7.")
-printspecialexcs(database.recordings, "8.")
-printspecialexcs(database.recordings, "9.")
+#makes list of only selected exercises [3]
+exercises = [ex for ex in database.sortRecExerc() if ex[0].exerciseNumber in DB.selectedExercises]
 
-print("===================================================")
-print(f"Precision: {100*precision:.1f}")
-print(f"Recall: {100*recall:.1f}")
-print(f"F1 Score: {100*f1_score:.1f}")
-print("===================================================")
+
+        
+
+        
+
+
+

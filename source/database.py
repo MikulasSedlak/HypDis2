@@ -20,6 +20,9 @@ SP2 = "/"
 SP3 = "_"
 testfilename = "resources/recordings/K/K1003/K1003_0.0_1.wav"
 
+loadpaths = ["wav2vec.csv", "audio2vec512.csv", "openL3-mean.csv", "pyannote.csv", "VGGish.csv"]
+selectedExercises = ["7.1-1-e","7.4-3","9.4"]
+
 ##Yet unused
 #def get_unique_filename(filename):
 #        base, ext = os.path.splitext(filename)
@@ -196,8 +199,14 @@ class Patient:
 
 
 class Database:
-    def __init__(self):
-        pass    
+    def confMatrix(self):
+        confMatrix = np.array([[0,0],[0,0]])
+        for recording in self.recordings:
+            confMatrix+=recording.confMatrix
+        return confMatrix
+
+        
+          
 
     def make(self,recordings):
         self.recordings = recordings
@@ -207,13 +216,16 @@ class Database:
         self.databaseFilename = databaseFile
         name = databaseFile.split(".")
         self.name = name[0]
-        print("loading ", databaseFile, "...")
+
+        if __debug__:
+            print("loading ", databaseFile, "...")
         databasePath ="resources/databases/" + databaseFile
         recordings = []
         with open(databasePath, "r") as openfileobject:
             for line in openfileobject:
                 recordings.append(Recording(line.strip()))
-        print(databasePath," loaded.")
+        if __debug__:
+            print(databasePath," loaded.")
 
         self.recordings = recordings
         self.patients = self.loadPatients()
@@ -244,13 +256,27 @@ class Database:
         f.close()
         print("Database has been saved to file", fileObjects)
 
+     #TODO:save matrixes in better format:
+    def saveConfusionMatrixes(self):
+        file ="resources/confusionMatrixes/" + self.name +"_CM" + ".csv"
+        f = open(file, "w")
+        
+        for recording in self.recordings:
+            if recording.accurate is None:
+                ValueError("Conf. Matrix cannot be saved.")
+            matrixStr = SP2.join(map(str,[item for sublist in recording.confMatrix for item in sublist]))
+            f.writelines([str(recording.path),SP1,matrixStr,os.linesep])
+
+        f.close()
+
+
     def loadConfusionMatrixes(self): #TODO rename to CMfromDatabase
         filename = self.name + "_CM" + ".csv"
-        print("loading ", self.databaseFilename, "...")
-        databasePath ="resources/Confusion_matrixes/" + filename
+        print("loading ", filename, "...")
+        databasePath ="resources/ConfusionMatrixes/" + filename
         with open(databasePath, "r") as openfileobject:
             for line in openfileobject:
-
+                
                 #splits into path
                 linestr = line.strip()
                 linestr= linestr.split(SP1)
@@ -258,22 +284,14 @@ class Database:
 
                 #create and save Conf matrix
                 values = linestr[1].split(SP2)
-                newMatrix = [[int(values[0]),int(values[1])],[int(values[2]),int(values[3])]]
+                newMatrix = np.array([[int(values[0]), int(values[1])], [int(values[2]), int(values[3])]])
                 self.recordings[idx].saveConfusionMatrix(newMatrix)
-
+        
+        
         print(f"{filename} succesfully made.")
 
-    #TODO:save matrixes in better format:
-    def saveConfusionMatrixes(self):
-        file ="resources/confusionMatrixes/" + self.name +"_CM" + ".csv"
-        f = open(file, "w")
-        for recording in self.recordings:
-            if recording.accurate is None:
-                ValueError("Conf. Matrix cannot be saved.")
-            matrixStr = SP2.join(map(str,[item for sublist in recording.confMatrix for item in sublist]))
-            f.writelines([str(recording.path),SP1,matrixStr,os.linesep])
-        f.close()
-
+   
+    
 
     def makeAudio2Vec(self, n,recordings):
         processor = Audio2Vec(n)
@@ -441,8 +459,8 @@ class Database:
     
     class Accuracy:
             
-        @classmethod
-        def exercises(self, database):
+        
+        def exercises(database):
             recordingsSortEx = database.sortRecExerc()
 
             for exercise in recordingsSortEx:
@@ -460,7 +478,23 @@ class Database:
                 print(f"TN: {exConfMatrix[0, 0]}")
                 print("---------------------------------------------------")
 
-        def mf(self,database):
+        
+
+        def sortExercises(database):
+            recordingsSortEx = database.sortRecExerc()
+            pairs = []
+            for exercise in recordingsSortEx:
+                pair = exercise[0].exerciseNumber,len(exercise)
+                pairs.append(pair)
+            sortedPairs = sorted(pairs, key=lambda x: x[0], reverse=True)
+
+            print("list of exercises:")
+            for number,times in sortedPairs:
+                print(f"{number}: {times}")
+            print("---------------------------------------------------")
+
+
+        def mf(database):
             M,F = database.splitGender()
             mAcc, fAcc = 0,0
             mCM,fCM = np.zeros((2, 2), dtype=int),np.zeros((2, 2), dtype=int)
@@ -491,8 +525,46 @@ class Database:
             print(f"TN: {fCM[0, 0]}")
             print("---------------------------------------------------")
 
-        
-    
+        def printspecialexcs(database,STR):
+            cm = np.zeros((2, 2), dtype=int)
+            for exercise in database.recordings:
+                if STR in exercise.exerciseNumber:
+                    cm += exercise.confMatrix
+            acu = (cm[1, 1]+cm[0,0])
+            racy= (cm[1, 1]+cm[0,0]+cm[1, 0]+cm[0, 1])
+            acuracy = acu/racy
+            print("---------------------------------------------------")
+            print(STR," ex. confusion Matrix:")
+            print(f"TP: {cm[1, 1]}", end="  ")
+            print(f"FN: {cm[1, 0]}")
+            print(f"FP: {cm[0, 1]}", end="  ")
+            print(f"TN: {cm[0, 0]}")
+            print(f"ex. accuracy is {acuracy:.2f} ({acu}/{racy})")
+
+        def printMetrics(database):
+            confusionMatrix = database.confMatrix()
+            print("---------------------------------------------------")
+            print("Confusion Matrix:")
+            print(f"TP: {confusionMatrix[1, 1]}", end="  ")
+            print(f"FN: {confusionMatrix[1, 0]}")
+            print(f"FP: {confusionMatrix[0, 1]}", end="  ")
+            print(f"TN: {confusionMatrix[0, 0]}")
+
+            acuracy =  (confusionMatrix[1,1] + confusionMatrix[0, 0])/(confusionMatrix[1,1] + confusionMatrix[0, 1]+confusionMatrix[1,0] + confusionMatrix[0,0])
+            precision = confusionMatrix[1,1] / (confusionMatrix[1,1] + confusionMatrix[0, 1])
+            recall = confusionMatrix[1,1] / (confusionMatrix[1,1] + confusionMatrix[1, 0])
+            f1_scored = 2 * (precision * recall) / (precision + recall)
+
+            print("---------------------------------------------------")
+            print("TOTAL")
+            print(f"Acurracy: {100*acuracy:.2f}")
+            print(f"Precision: {100*precision:.2f}")
+            print(f"Recall: {100*recall:.2f}")
+            print(f"F1 Score: {100*f1_scored:.2f}")
+            print("---------------------------------------------------")
+
+
+            
  
 def getSampleNumber(filepath):
         with wave.open(filepath, "r") as wf:
