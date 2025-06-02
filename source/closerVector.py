@@ -190,7 +190,9 @@ def evaluateSimilarity(database, use_median=False, weighted=False):
         pred_label = 1 if simP > simK else 0
         confMatrix[true_label, pred_label] += 1
 
-    print(f"Confusion Matrix ({method}, {strategy}): {database.name}")
+    print(f"{database.name} - {method}, {strategy}:")
+    print()
+    print("confusion matrix:")
     print(f"TP: {confMatrix[1, 1]}", end="  ")
     print(f"FN: {confMatrix[1, 0]}")
     print(f"FP: {confMatrix[0, 1]}", end="  ")

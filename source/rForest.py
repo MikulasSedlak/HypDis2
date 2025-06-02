@@ -11,7 +11,7 @@ import torch
 
 
 
-def randForest(database, nEstimators=150, dummy = False): #nEstimators = number of trees, dummy = True switches Random forest to dummy classifier
+def randForest(database, nEstimators=150, threshold = 0.55, dummy = False): #nEstimators = number of trees, dummy = True switches Random forest to dummy classifier
 
     #creates matrixes
     X, y, patientLabels = database.toTensor()
@@ -55,7 +55,6 @@ def randForest(database, nEstimators=150, dummy = False): #nEstimators = number 
             probs = model.predict_proba(X_test)[:, 1]
 
             #decision threshold 
-            threshold = 0.55
             y_pred = (probs > threshold).astype(int)
 
         #save CMs to recordings
@@ -73,7 +72,7 @@ def randForest(database, nEstimators=150, dummy = False): #nEstimators = number 
             print(f"k splits: {splitCount}/{kSplits}") 
 
     #database.saveConfusionMatrixes2()
-    DB.Database.Accuracy.printMetrics(database)
+    #DB.Database.Accuracy.printMetrics(database)
 
 
 def selectedExercises():
@@ -111,8 +110,8 @@ def selectedExercises():
 
 
 if __name__ == "__main__":
-    
-    databases = DB.loadAllDB()
+
+    databases = DB.loadAllDB(loadCM=True)
     scoresAll = []
 
     for database in databases:
@@ -125,10 +124,12 @@ if __name__ == "__main__":
         scores.append(CMatrix.recall())
         scores.append(CMatrix.f1score())
         scoresAll.append(scores)
+
     #print f1 scores
+    print(f"{'Name':<25} {'Accuracy':>10} {'Precision':>10} {'Recall':>10} {'F1-score':>10}")
     for i, column in enumerate(scoresAll):
-        print(DB.loadpaths[i], end="")
+        print(f"{DB.loadpaths[i]:<25}", end="")
         for value in column:
-            print(f" {100*value:.2f}", end ="")
-            print()
+            print(f"{100 * value:>10.2f}", end="")
+        print()
 

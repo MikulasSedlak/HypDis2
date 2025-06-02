@@ -197,13 +197,18 @@ class Database:
 
         if __debug__:
             print("loading ", databaseFile, "...")
-        databasePath ="resources/databases/" + databaseFile
+        #does dir exist
+        dir = "resources/databases/"
+        if not os.path.exists(dir):
+            raise ImportError(dir + " does not exist.")
+
+        databasePath = dir + databaseFile
         recordings = []
         with open(databasePath, "r") as openfileobject:
             for line in openfileobject:
                 recordings.append(Recording(line.strip()))
         if __debug__:
-            print(databasePath," loaded.")
+            print(databaseFile," loaded.")
 
         self.recordings = recordings
         self.patients = self.loadPatients()
@@ -236,8 +241,14 @@ class Database:
 
      #saves CMs to a file
     def saveConfusionMatrixes(self,file=None):
+        directory = "resources/ConfusionMatrixes/"
+
+        #checks if directory exists
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        #names file
         if file is None:
-            file ="resources/confusionMatrixes/" + self.name +"_CM" + ".csv"
+            file = directory + self.name + "_CM" + ".csv"
         f = open(file, "w")
         
         for recording in self.recordings:
@@ -253,11 +264,12 @@ class Database:
         if filename is None:
             filename = self.name + "_CM" + ".csv"
 
-        #if file does not exist
-        if not os.path.isfile(filename):
-            return False
         print("loading ", filename, "...")
         databasePath ="resources/ConfusionMatrixes/" + filename
+        #if file does not exist
+        if not os.path.isfile(databasePath):
+            return False
+    
         with open(databasePath, "r") as openfileobject:
             for line in openfileobject:
                 
@@ -616,19 +628,25 @@ def temp_fixWholeWindow(recordings):
         filepath = temp_filepath  # Update filepath to padded file
 
 #returns a list of all loaded databases 
-def loadAllDB():
-
+def loadAllDB(loadCM=False):
+    #loads all databases
     databases = []
     for loadpath in loadpaths:
         database = Database()
         database.load(loadpath)
 
-        #load model
-        if not database.loadConfusionMatrixes():
-            #if it doesnt exist it runs rForest
-            print("Confusion matrixes do not exist, running random forest")
-            rF.randForest(database)
-            database.saveConfusionMatrixes()
+        #loads CM
+        if loadCM == True:
+            #load model
+            if not database.loadConfusionMatrixes():
+                #if it doesnt exist it runs rForest
+                nEstimators = 150
+                decisionThreshold = 0.55
+                print("Confusion matrixes do not exist, running random forest...")
+                print(f"n of trees: {nEstimators}")
+                print(f"decision treshold: {decisionThreshold}")
+                rF.randForest(database,nEstimators=nEstimators, threshold= decisionThreshold)
+                database.saveConfusionMatrixes()
         databases.append(database)
     
     print("All databases loaded.")

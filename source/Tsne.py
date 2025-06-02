@@ -2,6 +2,7 @@ import numpy as np
 from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 import database as DB
+import os
 
 def getPDvecsIF(recordings,exerciseSTR): #gets ifvecs ...
     isExvec=[]
@@ -54,10 +55,12 @@ def graphIF(database, gender = False, ex = "7."):
         Group1, Group2 = getPDmalefemale(database.recordings)
         G1Name = "muži"
         G2Name = "ženy"
+        print(f"creating tSNE - {database.name}, gendered")
     else:
         Group1, Group2 = getPDvecsIF(database.recordings,ex)
         G1Name = "fonace"
         G2Name = "ostatní"
+        print(f"creating tSNE - {database.name}, exercise {ex}")
 
     Group1 = np.array(Group1)
     Group2 = np.array(Group2)
@@ -76,8 +79,8 @@ def graphIF(database, gender = False, ex = "7."):
         plt.title("t-SNE " + database.name + ", dle pohlaví")
         typeName = "_malefemale"
     else:
-         plt.title("t-SNE " + database.name + ", fonace")
-         typeName = "fonation"
+         plt.title("t-SNE " + database.name + ", " + G1Name)
+         typeName = "_" + G1Name
     plt.xlabel("dim 1")
     plt.ylabel("dim 2")
     plt.legend()
@@ -88,11 +91,14 @@ def graphIF(database, gender = False, ex = "7."):
     plt.gca().set_yticks([]) 
 
     #save picture
-    plt.savefig("tsne/" + database.name + typeName + '.png', dpi=300)
+    dir = "tsne/"
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+    plt.savefig(dir + database.name + typeName + '.png', dpi=300)
     #plt.show()
 
 def graphBasic(database):
-
+    print(f"creating tSNE - {database.name}, PD")
     #aquire data
     hasPDvec, noPDvec = database.getPDvecs()
     hasPDvec = np.array(hasPDvec)
@@ -118,12 +124,15 @@ def graphBasic(database):
     plt.gca().set_yticks([]) 
 
     #save picture
-    plt.savefig("tsne/" + database.name + '.png', dpi=300)
+    dir = "tsne/"
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+    plt.savefig(dir + database.name + '.png', dpi=300)
     #plt.show()
 
 if __name__ == "__main__":
     databases = DB.loadAllDB()
-    for database in DB: 
+    for database in databases: 
         graphBasic(database)
         graphIF(database, gender=False)
         graphIF(database, gender=True)

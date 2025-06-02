@@ -4,9 +4,11 @@ import pandas as pd
 import closerVector as cV
 import database as DB
 import numpy as np
+import os
 
 
 def boxplot(databases,use_median=True):
+    print("Creating boxplot ...")
     xticks = []
     #loads databases
     for i, database in enumerate(databases):
@@ -60,8 +62,16 @@ def boxplot(databases,use_median=True):
     plt.title('Vzdálenost od průměrných vektorů')
     plt.grid(axis='y')
     plt.yticks([-1, 0,1], ['bez HD',"", 'HD'])
-    plt.show()
-    #plt.savefig("boxplots/" + "boxplot_avg.png")
+    #plt.show()
+
+    #save picture
+    dir = "boxplots/"
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+    if use_median:
+        plt.savefig(dir + "boxplot_med.png")
+    else:
+        plt.savefig(dir + "boxplot_avg.png")
 
 def ratioOfLen():
      for path in DB.loadpaths:
