@@ -1,1 +1,0 @@
-matrixStr = SP2.join(map(str,[item for sublist in recording.confMatrix for item in sublist]))

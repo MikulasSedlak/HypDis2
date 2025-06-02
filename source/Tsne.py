@@ -3,163 +3,6 @@ from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 import database as DB
 
-def graph1(recordings, filename):
-    hasPDvec, noPDvec = DB.getPDvecs(recordings)
-    
-    hasPDvec = np.array(hasPDvec)
-    noPDvec = np.array(noPDvec)
-
-    data = np.concatenate([hasPDvec, noPDvec])
-
-    #tSNE
-    tsne = TSNE(n_components=2, random_state=1)
-    reduced_data = tsne.fit_transform(data)
-
-    #plot results
-    plt.figure(figsize=(8, 6))
-    plt.scatter(reduced_data[:len(hasPDvec), 0], reduced_data[:len(hasPDvec), 1], s=1, color='red', alpha=0.7, label='HD')
-    plt.scatter(reduced_data[len(hasPDvec):, 0], reduced_data[len(hasPDvec):, 1], s=1, color='blue', alpha=0.7, label='bez HD')
-    title = "t-SNE " + "Audio2vec"
-    plt.title(title)
-    plt.xlabel("dim 1")
-    plt.ylabel("dim 2")
-    plt.gca().set_xticks([])  # Hide x-axis numbers
-    plt.gca().set_yticks([]) 
-    plt.legend()
-    plt.grid(True)
-    #plt.show()
-    plt.subplots_adjust(bottom=0.07, top=0.93)
-    plt.savefig('Audio2vec.png', dpi=300)
-    plt.savefig('Audio2vec.svg', bbox_inches='tight', transparent=True)
-
-
-def graph3():
-    recordings = DB.loadDB("audio2vec100.csv")
-    hasPDvec, noPDvec = DB.getPDvecs(recordings)
-    hasPDvec = np.array(hasPDvec)
-    noPDvec = np.array(noPDvec)
-
-    data = np.concatenate([hasPDvec, noPDvec])
-
-    # Apply t-SNE
-    tsne = TSNE(n_components=2, random_state=1)
-    reduced_data = tsne.fit_transform(data)
-
-    # Plot the results
-    plt.figure(figsize=(8, 6))
-    plt.scatter(reduced_data[:len(hasPDvec), 0], reduced_data[:len(hasPDvec), 1], s=1, color='red', alpha=0.7, label='HD')
-    plt.scatter(reduced_data[len(hasPDvec):, 0], reduced_data[len(hasPDvec):, 1], s=1, color='blue', alpha=0.7, label='bez HD')
-    plt.title("t-SNE Vizualizace Audio2vec(7)")
-    plt.xlabel("dim 1")
-    plt.ylabel("dim 2")
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-
-def graph4(recordings): #wav2vec just phonation exercises
-    
-    hasPDvec, noPDvec = getPDvecsjustIF(recordings, "8.")
-    hasPDvec = np.array(hasPDvec)
-    noPDvec = np.array(noPDvec)
-
-    data = np.concatenate([hasPDvec, noPDvec])
-
-    # Apply t-SNE
-    tsne = TSNE(n_components=2, random_state=1)
-    reduced_data = tsne.fit_transform(data)
-
-    # Plot the results
-    plt.figure(figsize=(8, 6))
-    plt.scatter(reduced_data[:len(hasPDvec), 0], reduced_data[:len(hasPDvec), 1], s=10, color='red', alpha=0.7, label='HD')
-    plt.scatter(reduced_data[len(hasPDvec):, 0], reduced_data[len(hasPDvec):, 1], s=10, color='blue', alpha=0.7, label='bez HD')
-    plt.title("t-SNE Open3L - jen intonace")
-    plt.xlabel("dim 1")
-    plt.ylabel("dim 2")
-    plt.gca().set_xticks([])  # Hide x-axis numbers
-    plt.gca().set_yticks([]) 
-    plt.legend()
-    plt.grid(True)
-    #plt.show()
-    plt.subplots_adjust(bottom=0.07, top=0.93)
-    plt.savefig('OpenL3jInt.png', dpi=300)
-    plt.savefig('OpenL3jInt.svg', bbox_inches='tight', transparent=True)
-    plt.show()
-    
-
-def graph5(recordings): #phonation
-    
-    isExvec, noExvec = getPDvecsIF(recordings, "9.")
-    isExvec = np.array(isExvec)
-    noExvec = np.array(noExvec)
-
-    data = np.concatenate([isExvec, noExvec])
-
-    # Apply t-SNE
-    tsne = TSNE(n_components=2, random_state=1)
-    reduced_data = tsne.fit_transform(data)
-
-    # Plot the results
-    plt.figure(figsize=(8, 6))
-    plt.scatter(reduced_data[:len(isExvec), 0], reduced_data[:len(isExvec), 1], s=2, color='blue', alpha=0.7, label='fonace')
-    plt.scatter(reduced_data[len(isExvec):, 0], reduced_data[len(isExvec):, 1], s=1, color='red', alpha=0.7, label='ostatní')
-    plt.title("t-SNE Open3L - rychle opakovaná slova")
-    plt.xlabel("dim 1")
-    plt.ylabel("dim 2")
-    plt.gca().set_xticks([])  # Hide x-axis numbers
-    plt.gca().set_yticks([]) 
-    plt.legend()
-    plt.grid(True)
-    #plt.show()
-    plt.subplots_adjust(bottom=0.07, top=0.93)
-    plt.savefig('Open3LRych.png', dpi=300)
-    plt.savefig('Open3LRych.svg', bbox_inches='tight', transparent=True)
-
-def graphpatient(recordings): #phonation
-    
-    isExvec, noExvec = getPDvecsSame(recordings, "10.4-2")
-    isExvec = np.array(isExvec)
-    noExvec = np.array(noExvec)
-
-    data = np.concatenate([isExvec, noExvec])
-
-    # Apply t-SNE
-    tsne = TSNE(n_components=2, random_state=1)
-    reduced_data = tsne.fit_transform(data)
-
-    # Plot the results
-    plt.figure(figsize=(8, 6))
-    plt.scatter(reduced_data[:len(isExvec), 0], reduced_data[:len(isExvec), 1], s=1, color='blue', alpha=0.7, label='cvič. 0.0')
-    plt.scatter(reduced_data[len(isExvec):, 0], reduced_data[len(isExvec):, 1], s=1, color='red', alpha=0.7, label='ostatní')
-    plt.title("t-SNE Audio2vec - cvičení 0.0")
-    plt.xlabel("dim 1")
-    plt.ylabel("dim 2")
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-
-def graph7(): #wav2vec just chosen words
-    recordings = DB.loadDB("wav2vec.csv")
-    hasPDvec, noPDvec = getPDvecsjustIF(recordings, "10")
-    hasPDvec = np.array(hasPDvec)
-    noPDvec = np.array(noPDvec)
-
-    data = np.concatenate([hasPDvec, noPDvec])
-
-    # Apply t-SNE
-    tsne = TSNE(n_components=2, random_state=1)
-    reduced_data = tsne.fit_transform(data)
-
-    # Plot the results
-    plt.figure(figsize=(8, 6))
-    plt.scatter(reduced_data[:len(hasPDvec), 0], reduced_data[:len(hasPDvec), 1], s=5, color='blue', alpha=0.7, label='HD')
-    plt.scatter(reduced_data[len(hasPDvec):, 0], reduced_data[len(hasPDvec):, 1], s=5, color='red', alpha=0.7, label='bez HD')
-    plt.title("t-SNE Vizualizace Wav2vec, jen fonace")
-    plt.xlabel("dim 1")
-    plt.ylabel("dim 2")
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-
 def getPDvecsIF(recordings,exerciseSTR): #gets ifvecs ...
     isExvec=[]
     noExvec=[]
@@ -201,46 +44,66 @@ def getPDvecsjustIF(recordings,exerciseSTR): #gets PDvecs just if ...
                 noPD.append(recording.audio2vec)
     return hasPD, noPD
 
-def graph6(recordings): #gender
-    isMale, isFemale = getPDmalefemale(recordings)
-    isMale = np.array(isMale)
-    isFemale = np.array(isFemale)
+def graphIF(database, gender = False, ex = "7."): 
+    #graphs, based on a condition 
+    """gender=True to print gender differences
+    ex="Exercise number", to print avilaible different numbers run DB.Database.Accuracy.sortExercises(database)"""
 
-    data = np.concatenate([isMale, isFemale])
+    #aquire data
+    if gender:
+        Group1, Group2 = getPDmalefemale(database.recordings)
+        G1Name = "muži"
+        G2Name = "ženy"
+    else:
+        Group1, Group2 = getPDvecsIF(database.recordings,ex)
+        G1Name = "fonace"
+        G2Name = "ostatní"
 
-    # Apply t-SNE
+    Group1 = np.array(Group1)
+    Group2 = np.array(Group2)
+
+    data = np.concatenate([Group1, Group2])
+
+    #apply t-SNE
     tsne = TSNE(n_components=2, random_state=1)
     reduced_data = tsne.fit_transform(data)
 
     # Plot the results
     plt.figure(figsize=(8, 6))
-    plt.scatter(reduced_data[:len(isMale), 0], reduced_data[:len(isMale), 1], s=1, color='blue', alpha=0.7, label='muži')
-    plt.scatter(reduced_data[len(isMale):, 0], reduced_data[len(isMale):, 1], s=1, color='red', alpha=0.7, label='ženy')
-    plt.title("t-SNE OpenL3 - pohlaví")
+    plt.scatter(reduced_data[:len(Group1), 0], reduced_data[:len(Group1), 1], s=1, color='red', alpha=0.7, label=G1Name)
+    plt.scatter(reduced_data[len(Group1):, 0], reduced_data[len(Group1):, 1], s=1, color='blue', alpha=0.7, label=G2Name)
+    if gender:
+        plt.title("t-SNE " + database.name + ", dle pohlaví")
+        typeName = "_malefemale"
+    else:
+         plt.title("t-SNE " + database.name + ", fonace")
+         typeName = "fonation"
     plt.xlabel("dim 1")
     plt.ylabel("dim 2")
-    plt.gca().set_xticks([])  # Hide x-axis numbers
-    plt.gca().set_yticks([]) 
     plt.legend()
-    plt.grid(True)
+    plt.grid(False)
+
+    #hide axis numbers
+    plt.gca().set_xticks([])  
+    plt.gca().set_yticks([]) 
+
+    #save picture
+    plt.savefig("tsne/" + database.name + typeName + '.png', dpi=300)
     #plt.show()
-    plt.subplots_adjust(bottom=0.07, top=0.93)
-    plt.savefig('OpenL3GEN.png', dpi=300)
-    plt.savefig('OpenL3GEN.svg', bbox_inches='tight', transparent=True)
-    plt.show()
 
 def graphBasic(database):
-    hasPDvec, noPDvec = DB.getPDvecs(database.recordings)
+
+    #aquire data
+    hasPDvec, noPDvec = database.getPDvecs()
     hasPDvec = np.array(hasPDvec)
     noPDvec = np.array(noPDvec)
-
     data = np.concatenate([hasPDvec, noPDvec])
 
-    # Apply t-SNE
+    #apply t-SNE
     tsne = TSNE(n_components=2, random_state=1)
     reduced_data = tsne.fit_transform(data)
 
-    # Plot the results
+    #plot the results
     plt.figure(figsize=(8, 6))
     plt.scatter(reduced_data[:len(hasPDvec), 0], reduced_data[:len(hasPDvec), 1], s=1, color='red', alpha=0.7, label='HD')
     plt.scatter(reduced_data[len(hasPDvec):, 0], reduced_data[len(hasPDvec):, 1], s=1, color='blue', alpha=0.7, label='bez HD')
@@ -248,12 +111,19 @@ def graphBasic(database):
     plt.xlabel("dim 1")
     plt.ylabel("dim 2")
     plt.legend()
-    plt.grid(True)
-    plt.show()
+    plt.grid(False)
 
+    #hide axis numbers
+    plt.gca().set_xticks([])  
+    plt.gca().set_yticks([]) 
 
-filename = "VGGish.csv"
-data = DB.Database()
-data.load(filename)
-graphBasic(data)
+    #save picture
+    plt.savefig("tsne/" + database.name + '.png', dpi=300)
+    #plt.show()
 
+if __name__ == "__main__":
+    databases = DB.loadAllDB()
+    for database in DB: 
+        graphBasic(database)
+        graphIF(database, gender=False)
+        graphIF(database, gender=True)

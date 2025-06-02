@@ -3,11 +3,8 @@ import tensorflow as tf
 import tensorflow_hub as hub
 import soundfile as sf
 import resampy
-import pyannote.audio
-import pyannote.pipeline
+import rForest as rF
 import torch
-import torchaudio
-import math
 from scipy.sparse import coo_matrix
 from audio2vec import Audio2Vec
 import pyannote.audio
@@ -18,46 +15,39 @@ import numpy as np
 SP1 = ","
 SP2 = "/"
 SP3 = "_"
-testfilename = "resources/recordings/K/K1003/K1003_0.0_1.wav"
 
 loadpaths = ["wav2vec.csv", "audio2vec512.csv", "openL3-mean.csv", "pyannote.csv", "VGGish.csv"]
 selectedExercises = ["7.1-1-e","7.4-3","9.4"]
 
-##Yet unused
-#def get_unique_filename(filename):
-#        base, ext = os.path.splitext(filename)
-#        counter = 1
-#        while os.path.exists(filename):
-#            filename = f"{base}_{counter}{ext}"
-#            counter += 1
-#        return filename
 
-#TODO class CM, that calculates Precison, Recall, F1 score...
-
-class CM:
-    def __init__(self, matrix):
-        if not self.correctSize(matrix):
-            raise TypeError("Matrix size must be 2x2!")
+class CM: #confusion matrix
+    def __init__(self, matrix = [[0,0],[0,0]]):
         self.matrix = self.formatMatrix(matrix)
-        return self.matrix
     
     def __call__(self):
         return self.matrix
     
     def __add__(self, other):
-        newMatrix = np.array(self.matrix) + np.array(other.matrix)
+        newMatrix = np.array(self.matrix) + np.array(other)
         return CM(newMatrix)
     
     def precision(self):
-        TP, FN = self.matrix[0]
-        FP, TN = self.matrix[1]
+        TN, FP = self.matrix[0]
+        FN, TP = self.matrix[1]
         if TP + FP == 0:
             return 0.0
         return TP / (TP + FP)
 
+    def accuracy(self):
+        TN, FP = self.matrix[0]
+        FN, TP = self.matrix[1]
+        if (TP + FN + FP + TN) == 0:
+            return 0.0
+        return (TN + TP)/ (TP + FN + FP + TN)
+    
     def recall(self):
-        TP, FN = self.matrix[0]
-        FP, TN = self.matrix[1]
+        TN, FP = self.matrix[0]
+        FN, TP = self.matrix[1]
         if TP + FN == 0:
             return 0.0
         return TP / (TP + FN)
@@ -69,23 +59,21 @@ class CM:
             return 0.0
         return 2 * (p * r) / (p + r)
     
-    def formatMatrix(matrix):
-        # Convert numpy arrays to list
+    def formatMatrix(self,matrix):
+        #convert numpy arrays to list
         if isinstance(matrix, np.ndarray):
             matrix = matrix.tolist()
-        
-        # Convert torch tensors to list
+        #convert torch tensors to list
         else: 
             if isinstance(matrix, torch.Tensor):
                 matrix = matrix.tolist()
-        
-        # Validate structure
+        #raise error
         if not isinstance(matrix, list):
             raise TypeError("Matrix must be a list, numpy.ndarray, or torch.Tensor.")
-        
+        #shape
         if len(matrix) != 2:
             raise ValueError("Matrix must have exactly 2 rows.")
-        
+        #correct type
         for i, row in enumerate(matrix):
             if not isinstance(row, list):
                 raise TypeError(f"Row {i} is not a list.")
@@ -95,7 +83,7 @@ class CM:
                 if not isinstance(val, (int, float)):
                     raise TypeError(f"Element at position [{i}][{j}] must be an int or float.")
         
-        return matrix  # return the validated and converted matrix
+        return matrix 
     
     def isAccurate(self):
         if self.matrix[0][0] == 1 or self.matrix[1][1] == 1:
@@ -117,16 +105,20 @@ class Recording:
   
         if name == "1.wav":
             name.pop()
-        
+        #PD diagnosis
         if name[0][0]=="P":
             self.hasPD = True
         else:
             self.hasPD = False
-            
-        self.patientNumber = name[0]
-        self.exerciseNumber = name[1]
-        if name[0][1] == "2":
 
+        #patient number
+        self.patientNumber = name[0]
+
+        #exercise id
+        self.exerciseNumber = name[1]
+
+        #gender
+        if name[0][1] == "2":
             self.isMale = True
         else: 
             self.isMale = False
@@ -147,14 +139,8 @@ class Recording:
             audiovector = audiovector.tolist()
         self.audio2vec = audiovector
         self.audio2vecStr = SP2.join(map(str,audiovector))
-    
-    #def wav2vecSave(self,audiovector):
-    #    self.wav2vecTensor = audiovector
 
-    #def pyannoteSave(self,audiovector):
-    #    self.pyannoteVec = audiovector
-
-    #TODO use CM
+    #saves confusion matrix to confMatrix
     def saveConfusionMatrix(self,singleConfMatrix):
         self.confMatrix = singleConfMatrix
         if singleConfMatrix[0,0] == 1 or singleConfMatrix[1,1] == 1:
@@ -162,19 +148,10 @@ class Recording:
         else:
             self.accurate = False
     
-def getPDvecs(recordings): #takes list of recordings retruns two tensors with [hasPDvec, noPDvec]
-    #TODO rename to split2PD
-    hasPDvec=[]
-    noPDvec=[]
-    for recording in recordings:
-        if recording.hasPD:
-            hasPDvec.append(recording.audio2vec)
-        else:
-            noPDvec.append(recording.audio2vec)
-    return hasPDvec, noPDvec
 
-    
-def get_all_file_paths(dir="resources/recordings"):   #filepaths = get_all_file_paths("resources/recordings")
+
+
+def get_all_file_paths(dir="resources/recordings"):   
     file_paths = []
     filecount = 0
     for root, _, files in os.walk(dir):
@@ -199,19 +176,20 @@ class Patient:
 
 
 class Database:
+
+    #summing confusion matrix
     def confMatrix(self):
         confMatrix = np.array([[0,0],[0,0]])
         for recording in self.recordings:
             confMatrix+=recording.confMatrix
         return confMatrix
 
-        
-          
-
+    #copies database
     def make(self,recordings):
         self.recordings = recordings
         self.patients = self.loadPatients()
 
+    #loads database from file
     def load(self,databaseFile="files.csv"):
         self.databaseFilename = databaseFile
         name = databaseFile.split(".")
@@ -229,7 +207,8 @@ class Database:
 
         self.recordings = recordings
         self.patients = self.loadPatients()
-
+    
+    #returns list of patients with their recordings
     def loadPatients(self):
         patientList = []
         
@@ -242,36 +221,41 @@ class Database:
         return patientList
     
 
-        
+    #saves embeddings to a file (fileObjects = name_of_a_file.csv)
     def save(self, fileObjects=None):
         if fileObjects == "files.csv":
-            raise NameError("Cannot save as files.csv")           
+            raise NameError("Cannot overwrite files.csv")           
         if fileObjects is None:
             fileObjects = self.databaseFilename
         file ="resources/databases/" + fileObjects
-        #unique_filename = get_unique_filename("results.txt")
         f = open(file, "w")
         for recording in self.recordings:
             f.writelines([recording.path,SP1,recording.audio2vecStr,os.linesep])
         f.close()
         print("Database has been saved to file", fileObjects)
 
-     #TODO:save matrixes in better format:
-    def saveConfusionMatrixes(self):
-        file ="resources/confusionMatrixes/" + self.name +"_CM" + ".csv"
+     #saves CMs to a file
+    def saveConfusionMatrixes(self,file=None):
+        if file is None:
+            file ="resources/confusionMatrixes/" + self.name +"_CM" + ".csv"
         f = open(file, "w")
         
         for recording in self.recordings:
             if recording.accurate is None:
-                ValueError("Conf. Matrix cannot be saved.")
+                raise ValueError("Conf. Matrix cannot be saved.")
             matrixStr = SP2.join(map(str,[item for sublist in recording.confMatrix for item in sublist]))
             f.writelines([str(recording.path),SP1,matrixStr,os.linesep])
 
         f.close()
 
+    #loads CMs from a file
+    def loadConfusionMatrixes(self,filename=None):
+        if filename is None:
+            filename = self.name + "_CM" + ".csv"
 
-    def loadConfusionMatrixes(self): #TODO rename to CMfromDatabase
-        filename = self.name + "_CM" + ".csv"
+        #if file does not exist
+        if not os.path.isfile(filename):
+            return False
         print("loading ", filename, "...")
         databasePath ="resources/ConfusionMatrixes/" + filename
         with open(databasePath, "r") as openfileobject:
@@ -289,10 +273,20 @@ class Database:
         
         
         print(f"{filename} succesfully made.")
+        return True
 
-   
+    #returns two lists of recordings: hasPDvec, noPDvec
+    def getPDvecs(self):
+        hasPDvec=[]
+        noPDvec=[]
+        for recording in self.recordings:
+            if recording.hasPD:
+                hasPDvec.append(recording.audio2vec)
+            else:
+                noPDvec.append(recording.audio2vec)
+        return hasPDvec, noPDvec
     
-
+    #makes audio2Vec embeddings from recordings
     def makeAudio2Vec(self, n,recordings):
         processor = Audio2Vec(n)
         fileCount = 0
@@ -319,41 +313,28 @@ class Database:
                 fileCount+=1
                 print("filecount: ",fileCount)
         print(f"All embeddings of {n} features, were created !")
-        self.recordings = recordings
-    
-    @staticmethod
-    def makeRecording(recording, inference):
-        filepath = recording.path
-        # checking if it is a file
-        if os.path.isfile(filepath):
-            #sampleCount = getSampleNumber(filepath)
-            #print("Samples: {n}", sampleCount)
-            
-            embedding = inference(filepath)
-            embedding = np.median(embedding.data, axis=0)
-            recording.audio2vecSave(embedding)
+        self.recordings = recordings    
 
+    #makes pyannote embeddings from recordings
     def makePyannote(self):
-
+        #load pre-trained speaker embedding model
+        #must have your authorisation token from huggingface.com
+        use_auth_token = "REPLACE_WITH_YOUR_TOKEN"
+        if use_auth_token == "REPLACE_WITH_YOUR_TOKEN":
+            raise ValueError("Replace use_auth_token with a valid token form huggingface.com")
+        model = Model.from_pretrained("pyannote/embedding", use_auth_token, revision="main", strict=False)
+        inference = Inference(model, window="sliding")
         from pyannote.audio import Model
         from pyannote.audio import Inference
-
-        # Load pre-trained speaker embedding model
-        model = Model.from_pretrained("pyannote/embedding", use_auth_token="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", revision="main", strict=False)
-        inference = Inference(model, window="sliding")
-        
-        
-        #multithreading doesnt work  
-
-            #from multiprocessing import Pool
-            #import multiprocessing
-            #cpusUsed = multiprocessing.cpu_count()-2
-            
-            #with Pool(processes=multiprocessing.cpu_count()-2) as pool:  # Use all available CPU cores
-                #pool.starmap(self.makeRecording, [(rec, inference) for rec in self.recordings], chunksize=int(len(self.recordings)/cpusUsed))
         for recording in self.recordings:
-           self.makeRecording(recording, inference)
+            filepath = recording.path
+            # checking if it is a file
+            if os.path.isfile(filepath):
+                embedding = inference(filepath)
+                embedding = np.median(embedding.data, axis=0)
+                recording.audio2vecSave(embedding)
 
+    #makes VGGish embeddings from recordings
     def makeVGGish(self):
         def load_audio(file_path, target_sr=16000):
             audio, sr = sf.read(file_path)
@@ -395,9 +376,9 @@ class Database:
             #print("")
             #count+=1
 
-
+    #returns matrix with embeddings, vector of labels (1 for has PD, 1 for CG) and patientLabels (same number for all patient's recordings)
     def toTensor(self, labelsON=True): 
-        #returns matrix with embeddings and vector of labels (1 for has PD, -1 for CG)
+        
         matrix, labels, patientLabels = [], [], []
         personsUsed = []
         
@@ -424,7 +405,8 @@ class Database:
         
         else:
             return matrix,
-        
+
+    #returns list of exercises 
     def sortRecExerc(self):
         recordingsSorted = []
         #FileCount = 0
@@ -444,6 +426,27 @@ class Database:
             #print("File: ", FileCount, "/",len(recordings)) #checking print
         return recordingsSorted
 
+    #returns list of patients
+    def sortRecPatients(self):
+        recordingsSorted = []
+        #FileCount = 0
+        for recording in self.recordings:
+            recordingAdded = False
+            if not recordingsSorted == []:
+                for recGroup in recordingsSorted:
+                    if recGroup[0].patientNumber == recording.patientNumber:
+                        recGroup.append(recording)
+                        recordingAdded = True
+                        break
+            if not recordingAdded:
+                recGroup = []
+                recordingsSorted.append(recGroup)
+                recordingsSorted[-1].append(recording)
+            #FileCount += 1
+            #print("File: ", FileCount, "/",len(recordings)) #checking print
+        return recordingsSorted
+    
+    #returns two lists of recordings
     def splitGender(self): #takes group, returns two - M,F
         M = []
         F = []
@@ -457,9 +460,10 @@ class Database:
                 countF +=1
         return M,F
     
+    #class for printing statistical values
     class Accuracy:
-            
-        
+
+        #calculates and prints CM of each exercise
         def exercises(database):
             recordingsSortEx = database.sortRecExerc()
 
@@ -476,10 +480,10 @@ class Database:
                 print(f"FN: {exConfMatrix[1, 0]}")
                 print(f"FP: {exConfMatrix[0, 1]}", end="  ")
                 print(f"TN: {exConfMatrix[0, 0]}")
-                print("---------------------------------------------------")
+                print("-" * 50)
 
         
-
+        #sorts and prints exercises accroding their number of recordings
         def sortExercises(database):
             recordingsSortEx = database.sortRecExerc()
             pairs = []
@@ -491,9 +495,26 @@ class Database:
             print("list of exercises:")
             for number,times in sortedPairs:
                 print(f"{number}: {times}")
-            print("---------------------------------------------------")
+            print("-" * 50)
 
+        #deletes exercises that have less than minimum of recordings
+        def excludeExercises(database, minimum= 90):
+            recordingsSortEx = database.sortRecExerc()
+            excludePairs = []
+            deleted = 0
+            for exercise in recordingsSortEx:
+                pair = exercise[0].exerciseNumber,len(exercise)
+                if pair[1]<minimum:
+                    excludePairs.append(pair[0])
+            for recording in database.recordings:
+                if recording.exerciseNumber in excludePairs:
+                    database.recordings.remove(recording)
+                    deleted += 1
+            
+            print("recordings deleted = ", deleted)
+            print("-" * 50)
 
+        #calculates and prints metrics for each gender 
         def mf(database):
             M,F = database.splitGender()
             mAcc, fAcc = 0,0
@@ -508,23 +529,24 @@ class Database:
                     fAcc+=1
             mAccP = 100*mAcc/len(M)
             fAccP = 100*fAcc/len(F)
-            print("---------------------------------------------------")
+            print("-" * 50)
             print(f"Male accuracy is {mAccP:.2f} ({mAcc}/{len(M)})")
             print(f"Female accuracy is {fAccP:.2f} ({fAcc}/{len(F)})")
-            print("---------------------------------------------------")
+            print("-" * 50)
             print("Male CM:")
             print(f"TP: {mCM[1, 1]}", end="  ")
             print(f"FN: {mCM[1, 0]}")
             print(f"FP: {mCM[0, 1]}", end="  ")
             print(f"TN: {mCM[0, 0]}")
-            print("---------------------------------------------------")
+            print("-" * 50)
             print("Female CM:")
             print(f"TP: {fCM[1, 1]}", end="  ")
             print(f"FN: {fCM[1, 0]}")
             print(f"FP: {fCM[0, 1]}", end="  ")
             print(f"TN: {fCM[0, 0]}")
-            print("---------------------------------------------------")
+            print("-" * 50)
 
+        #calculates and prints metrics for specific exercise
         def printspecialexcs(database,STR):
             cm = np.zeros((2, 2), dtype=int)
             for exercise in database.recordings:
@@ -533,7 +555,7 @@ class Database:
             acu = (cm[1, 1]+cm[0,0])
             racy= (cm[1, 1]+cm[0,0]+cm[1, 0]+cm[0, 1])
             acuracy = acu/racy
-            print("---------------------------------------------------")
+            print("-" * 50)
             print(STR," ex. confusion Matrix:")
             print(f"TP: {cm[1, 1]}", end="  ")
             print(f"FN: {cm[1, 0]}")
@@ -541,9 +563,10 @@ class Database:
             print(f"TN: {cm[0, 0]}")
             print(f"ex. accuracy is {acuracy:.2f} ({acu}/{racy})")
 
+        #calculates and prints metrics for whole database
         def printMetrics(database):
             confusionMatrix = database.confMatrix()
-            print("---------------------------------------------------")
+            print("-" * 50)
             print("Confusion Matrix:")
             print(f"TP: {confusionMatrix[1, 1]}", end="  ")
             print(f"FN: {confusionMatrix[1, 0]}")
@@ -555,51 +578,58 @@ class Database:
             recall = confusionMatrix[1,1] / (confusionMatrix[1,1] + confusionMatrix[1, 0])
             f1_scored = 2 * (precision * recall) / (precision + recall)
 
-            print("---------------------------------------------------")
+            print("-" * 50)
             print("TOTAL")
             print(f"Acurracy: {100*acuracy:.2f}")
             print(f"Precision: {100*precision:.2f}")
             print(f"Recall: {100*recall:.2f}")
             print(f"F1 Score: {100*f1_scored:.2f}")
-            print("---------------------------------------------------")
+            print("-" * 50)
 
 
             
- 
+#number of samples
 def getSampleNumber(filepath):
         with wave.open(filepath, "r") as wf:
             num_samples = wf.getnframes()
         return num_samples
 
+#if a recording is too short fixes its size
 def temp_fixWholeWindow(recordings):
-            # Checks if the recording isnt too short (Since some recordings had a feature extracting problem when file was under 1 sec) 
-            import soundfile as sf
-            # Load the audio
-            y, sr = librosa.load(filepath, sr=None)
-            duration = len(y) / sr  # Calculate duration in seconds
-            print(f"Original Duration: {duration} seconds")
+    # Checks if the recording isnt too short (Since some recordings had a feature extracting problem when file was under 1 sec) 
+    import soundfile as sf
+    # Load the audio
+    y, sr = librosa.load(filepath, sr=None)
+    duration = len(y) / sr  # Calculate duration in seconds
+    print(f"Original Duration: {duration} seconds")
 
-            # Ensure at least 1 second of audio
-            min_duration = 0.25  # Minimum required duration in seconds
-            if duration < min_duration:
-                padding = int(sr * min_duration) - len(y)  # Calculate padding length
-                y = np.pad(y, (0, padding), mode="constant")  # Pad with zeros
-                print(f"Padded Duration: {len(y) / sr} seconds!!!!!!!!!!!!!!!!!!!!")
+    # Ensure at least 1 second of audio
+    min_duration = 0.25  # Minimum required duration in seconds
+    if duration < min_duration:
+        padding = int(sr * min_duration) - len(y)  # Calculate padding length
+        y = np.pad(y, (0, padding), mode="constant")  # Pad with zeros
+        print(f"Padded Duration: {len(y) / sr} seconds!.")
 
-                # Save the padded file temporarily
-                temp_filepath = filepath.replace(".wav", "_padded.wav")
-                sf.write(temp_filepath, y, sr)
-                filepath = temp_filepath  # Update filepath to padded file
+        # Save the padded file temporarily
+        temp_filepath = filepath.replace(".wav", "_padded.wav")
+        sf.write(temp_filepath, y, sr)
+        filepath = temp_filepath  # Update filepath to padded file
 
+#returns a list of all loaded databases 
+def loadAllDB():
 
+    databases = []
+    for loadpath in loadpaths:
+        database = Database()
+        database.load(loadpath)
 
-#from multiprocessing import freeze_support
-#if __name__ == '__main__':
-#    freeze_support()  # Needed for Windows/macOS
-#    pyannoteDB = Database()
-#    pyannoteDB.makePyannote()
-#    pyannoteDB.save(fileObjects="pyannote.csv")
-#    pyannoteDB = Database()
-#    pyannoteDB.load("pyannote.csv")
-#    pyannoteDB.loadConfusionMatrixes()
-#    print(pyannoteDB.recordings[0].accuracy)
+        #load model
+        if not database.loadConfusionMatrixes():
+            #if it doesnt exist it runs rForest
+            print("Confusion matrixes do not exist, running random forest")
+            rF.randForest(database)
+            database.saveConfusionMatrixes()
+        databases.append(database)
+    
+    print("All databases loaded.")
+    return databases
